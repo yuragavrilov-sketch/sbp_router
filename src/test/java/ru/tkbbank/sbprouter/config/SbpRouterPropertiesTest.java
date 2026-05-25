@@ -48,4 +48,12 @@ class SbpRouterPropertiesTest {
         assertThat(props.getUpstreams().get("infosrv").getUrl()).isNotBlank();
         assertThat(props.getUpstreams().get("infosrv").getRetry()).isNotNull();
     }
+
+    @org.junit.jupiter.api.Test
+    void bindsAdminHistoryAndConfigDefaults() {
+        var props = new SbpRouterProperties();
+        assertThat(props.getAdmin().getToken()).isEqualTo("");
+        assertThat(props.getHistory().getCapacity()).isEqualTo(1000);
+        assertThat(props.getConfig().getOverridePath()).isEqualTo("config/runtime-overrides.json");
+    }
 }

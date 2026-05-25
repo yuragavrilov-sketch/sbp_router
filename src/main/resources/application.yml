@@ -77,6 +77,13 @@ sbp-router:
   routing:
     tkb-pay-enabled: false
 
+  admin:
+    token: ${SBP_ADMIN_TOKEN:change-me-in-prod}
+  history:
+    capacity: 1000
+  config:
+    override-path: config/runtime-overrides.json
+
   upstreams:
     infosrv:
       url: http://infosrv.bank.local/api/gcsvc

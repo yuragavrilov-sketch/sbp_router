@@ -16,6 +16,9 @@ public class SbpRouterProperties {
     private Terminals terminals = new Terminals();
     private Routing routing = new Routing();
     private Map<String, UpstreamConfig> upstreams;
+    private Admin admin = new Admin();
+    private History history = new History();
+    private ConfigFile config = new ConfigFile();
 
     public Map<String, ExtractionRuleSet> getExtractionRules() { return extractionRules; }
     public void setExtractionRules(Map<String, ExtractionRuleSet> extractionRules) { this.extractionRules = extractionRules; }
@@ -25,6 +28,12 @@ public class SbpRouterProperties {
     public void setRouting(Routing routing) { this.routing = routing; }
     public Map<String, UpstreamConfig> getUpstreams() { return upstreams; }
     public void setUpstreams(Map<String, UpstreamConfig> upstreams) { this.upstreams = upstreams; }
+    public Admin getAdmin() { return admin; }
+    public void setAdmin(Admin admin) { this.admin = admin; }
+    public History getHistory() { return history; }
+    public void setHistory(History history) { this.history = history; }
+    public ConfigFile getConfig() { return config; }
+    public void setConfig(ConfigFile config) { this.config = config; }
 
     public static class ExtractionRuleSet {
         private List<FieldRule> routingFields;
@@ -95,5 +104,23 @@ public class SbpRouterProperties {
         public void setMaxAttempts(int maxAttempts) { this.maxAttempts = maxAttempts; }
         public Duration getBackoff() { return backoff; }
         public void setBackoff(Duration backoff) { this.backoff = backoff; }
+    }
+
+    public static class Admin {
+        private String token = "";
+        public String getToken() { return token; }
+        public void setToken(String token) { this.token = token; }
+    }
+
+    public static class History {
+        private int capacity = 1000;
+        public int getCapacity() { return capacity; }
+        public void setCapacity(int capacity) { this.capacity = capacity; }
+    }
+
+    public static class ConfigFile {
+        private String overridePath = "config/runtime-overrides.json";
+        public String getOverridePath() { return overridePath; }
+        public void setOverridePath(String overridePath) { this.overridePath = overridePath; }
     }
 }
