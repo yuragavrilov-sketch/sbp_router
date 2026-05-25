@@ -41,5 +41,7 @@ public class MetricsService {
                 .register(registry).increment();
     }
 
+    public void recordConfigReload() { registry.counter("sbp_router_config_reloads_total").increment(); }
+
     private String safe(String value) { return value != null ? value : "unknown"; }
 }

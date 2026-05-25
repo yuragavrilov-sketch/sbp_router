@@ -1,8 +1,11 @@
 package ru.tkbbank.sbprouter.management;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import ru.tkbbank.sbprouter.config.RouterConfigSnapshot;
 import ru.tkbbank.sbprouter.config.SbpRouterProperties;
+import ru.tkbbank.sbprouter.observability.MetricsService;
 
 import java.util.Map;
 import java.util.function.Function;
@@ -10,12 +13,16 @@ import java.util.function.Function;
 /** Orchestrates a config change: version check -> build -> validate -> persist -> apply. */
 @Service
 public class ConfigService {
+    private static final Logger log = LoggerFactory.getLogger(ConfigService.class);
     private final ConfigStore store;
     private final ConfigValidator validator;
     private final ConfigOverrideRepository overrideRepository;
+    private final MetricsService metrics;
 
-    public ConfigService(ConfigStore store, ConfigValidator validator, ConfigOverrideRepository overrideRepository) {
+    public ConfigService(ConfigStore store, ConfigValidator validator, ConfigOverrideRepository overrideRepository,
+                         MetricsService metrics) {
         this.store = store; this.validator = validator; this.overrideRepository = overrideRepository;
+        this.metrics = metrics;
     }
 
     public synchronized RouterConfigSnapshot updateRouting(SbpRouterProperties.Routing r, long expectedVersion) {
@@ -38,6 +45,8 @@ public class ConfigService {
         validator.validate(next);       // -> 400
         overrideRepository.save(next);   // -> 500, память не трогаем
         store.replace(next);             // применяем только после успешной записи
+        log.info("Config reloaded: version {} -> {}", current.version(), next.version());
+        metrics.recordConfigReload();
         return next;
     }
 }
