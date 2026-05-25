@@ -22,6 +22,12 @@ class RequestHistoryStoreTest {
         var s = new RequestHistoryStore(10); IntStream.rangeClosed(1, 5).forEach(i -> s.add(rec("r" + i)));
         assertThat(s.recent(2)).hasSize(2);
     }
+    @Test void recentWithNonPositiveLimitReturnsEmpty() {
+        var s = new RequestHistoryStore(10);
+        s.add(rec("a"));
+        org.assertj.core.api.Assertions.assertThat(s.recent(0)).isEmpty();
+        org.assertj.core.api.Assertions.assertThat(s.recent(-5)).isEmpty();
+    }
     @Test void concurrentAddsKeepCapacityInvariant() throws InterruptedException {
         var s = new RequestHistoryStore(100);
         var threads = IntStream.range(0, 8).mapToObj(t -> new Thread(() -> { for (int i = 0; i < 1000; i++) s.add(rec("t" + t + "-" + i)); })).toList();

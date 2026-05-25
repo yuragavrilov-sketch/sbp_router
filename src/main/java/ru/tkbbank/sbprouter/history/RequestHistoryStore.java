@@ -23,6 +23,7 @@ public class RequestHistoryStore {
         buffer.addLast(record);
     }
     public synchronized List<RequestRecord> recent(int limit) {
+        if (limit <= 0) return List.of();
         List<RequestRecord> out = new ArrayList<>(Math.min(limit, buffer.size()));
         Iterator<RequestRecord> it = buffer.descendingIterator();
         while (it.hasNext() && out.size() < limit) out.add(it.next());
