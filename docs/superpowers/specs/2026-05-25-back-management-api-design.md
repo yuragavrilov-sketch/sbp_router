@@ -37,7 +37,7 @@ Management-API нет.
 ## Архитектура
 
 ```
-   Платформа ──► POST /api/gcsvc ──► [GcsvcHandler ─ XmlFieldExtractor ─ RoutingDecisionEngine ─ ProxyClient]
+   Платформа ──► POST /api/gcsvc ──► [GcsvcHandler ─ XmlFieldExtractor ─ TerminalDetector ─ RoutingDecisionEngine ─ ProxyClient]
                                               │  читают конфиг по факту                          │ пишет запись
                                               ▼                                                  ▼
                                         ConfigStore                                      RequestHistoryStore
@@ -85,6 +85,7 @@ Management-API нет.
 |---|---|---|
 | `XmlFieldExtractor` | кэширует `properties.getExtractionRules()` в конструкторе | читает `configStore.current().extractionRules()` по факту |
 | `RoutingDecisionEngine` | кэширует `Routing` в конструкторе | читает `configStore.current().routing()` по факту |
+| `TerminalDetector` | кэширует `terminals` (списки/поля/префикс) в конструкторе | читает `configStore.current().terminals()` по факту |
 | `ProxyClient` | кэширует `getUpstreams()` в конструкторе | читает `configStore.current().upstreams()` по факту |
 | `GcsvcHandler` | логирует запрос | дополнительно пишет `RequestRecord` в `RequestHistoryStore` |
 
