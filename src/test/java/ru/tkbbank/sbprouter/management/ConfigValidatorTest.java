@@ -62,4 +62,13 @@ class ConfigValidatorTest {
         assertThatThrownBy(() -> validator.validate(validBase().extractionRules(Map.of("ReqAuthPay", rs)).build()))
                 .isInstanceOf(ConfigValidationException.class);
     }
+    @Test void rejectsNonPositiveUpstreamTimeout() {
+        var u = upstream("http://infosrv/api"); u.setTimeout(java.time.Duration.ZERO);
+        var snap = validBase().upstreams(java.util.Map.of(
+                "infosrv", u,
+                "stub-verification", upstream("http://x/y"),
+                "stub-connector", upstream("http://x/z"))).build();
+        var ex = org.assertj.core.api.Assertions.catchThrowableOfType(() -> validator.validate(snap), ConfigValidationException.class);
+        org.assertj.core.api.Assertions.assertThat(ex.getField()).endsWith(".timeout");
+    }
 }

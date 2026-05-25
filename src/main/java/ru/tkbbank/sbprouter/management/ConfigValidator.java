@@ -66,6 +66,7 @@ public class ConfigValidator {
             String base = "extractionRules." + type;
             if (!KNOWN_REQUEST_TYPES.contains(type))
                 throw new ConfigValidationException(base, "unknown request type '" + type + "'");
+            if (ruleSet == null) throw new ConfigValidationException(base, "extraction rule set must not be null");
             Set<String> names = new HashSet<>();
             for (FieldRule r : allRules(ruleSet)) {
                 requireText(base + ".name", r.getName());

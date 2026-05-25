@@ -31,7 +31,7 @@ public class ConfigService {
         return apply(expectedVersion, b -> b.extractionRules(rules));
     }
 
-    private RouterConfigSnapshot apply(long expectedVersion, Function<RouterConfigSnapshot.Builder, RouterConfigSnapshot.Builder> patch) {
+    private synchronized RouterConfigSnapshot apply(long expectedVersion, Function<RouterConfigSnapshot.Builder, RouterConfigSnapshot.Builder> patch) {
         RouterConfigSnapshot current = store.current();
         if (current.version() != expectedVersion) throw new VersionConflictException(expectedVersion, current.version());
         RouterConfigSnapshot next = patch.apply(RouterConfigSnapshot.builder(current)).version(current.version() + 1).build();

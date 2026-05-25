@@ -20,8 +20,10 @@ public class TerminalDetector {
     }
 
     public TerminalOwner detect(Map<String, String> fields) {
+        // read snapshot per call so runtime config changes take effect without restart
         SbpRouterProperties.Terminals terminals = configStore.current().terminals();
-        Set<String> tkbPayList = Set.copyOf(terminals.getTkbPayList());
+        java.util.List<String> rawList = terminals.getTkbPayList();
+        Set<String> tkbPayList = rawList != null ? Set.copyOf(rawList) : Set.of();
         String c2bFieldName = terminals.getC2bTerminal().getFieldName();
         String b2cFieldName = terminals.getB2cTerminal().getFieldName();
         String b2cPrefix = terminals.getB2cTerminal().getTkbPayPrefix();

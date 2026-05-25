@@ -41,11 +41,16 @@ public class ConfigOverrideRepository {
             Path parent = path.toAbsolutePath().getParent();
             if (parent != null) Files.createDirectories(parent);
             Path tmp = Files.createTempFile(parent, "override-", ".tmp");
-            Files.write(tmp, objectMapper.writerWithDefaultPrettyPrinter().writeValueAsBytes(snapshot));
             try {
-                Files.move(tmp, path, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
-            } catch (AtomicMoveNotSupportedException ex) {
-                Files.move(tmp, path, StandardCopyOption.REPLACE_EXISTING);
+                Files.write(tmp, objectMapper.writerWithDefaultPrettyPrinter().writeValueAsBytes(snapshot));
+                try {
+                    Files.move(tmp, path, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+                } catch (AtomicMoveNotSupportedException ex) {
+                    Files.move(tmp, path, StandardCopyOption.REPLACE_EXISTING);
+                }
+            } catch (IOException e) {
+                Files.deleteIfExists(tmp);
+                throw e;
             }
         } catch (IOException e) {
             log.error("Failed to write config override {}: {}", path, e.getMessage());
