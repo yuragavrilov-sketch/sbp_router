@@ -10,12 +10,15 @@ import org.springframework.web.reactive.function.server.ServerResponse;
 import reactor.core.publisher.Mono;
 import ru.tkbbank.sbprouter.extraction.ExtractionResult;
 import ru.tkbbank.sbprouter.extraction.XmlFieldExtractor;
+import ru.tkbbank.sbprouter.history.RequestHistoryStore;
+import ru.tkbbank.sbprouter.history.RequestRecord;
 import ru.tkbbank.sbprouter.observability.MetricsService;
 import ru.tkbbank.sbprouter.routing.RouteDecision;
 import ru.tkbbank.sbprouter.routing.RoutingDecisionEngine;
 import ru.tkbbank.sbprouter.routing.TerminalDetector;
 import ru.tkbbank.sbprouter.routing.TerminalOwner;
 
+import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -32,19 +35,22 @@ public class GcsvcHandler {
     private final ProxyClient proxyClient;
     private final ErrorResponseBuilder errorResponseBuilder;
     private final MetricsService metrics;
+    private final RequestHistoryStore history;
 
     public GcsvcHandler(XmlFieldExtractor extractor,
                         TerminalDetector terminalDetector,
                         RoutingDecisionEngine routingEngine,
                         ProxyClient proxyClient,
                         ErrorResponseBuilder errorResponseBuilder,
-                        MetricsService metrics) {
+                        MetricsService metrics,
+                        RequestHistoryStore history) {
         this.extractor = extractor;
         this.terminalDetector = terminalDetector;
         this.routingEngine = routingEngine;
         this.proxyClient = proxyClient;
         this.errorResponseBuilder = errorResponseBuilder;
         this.metrics = metrics;
+        this.history = history;
     }
 
     public Mono<ServerResponse> handle(ServerRequest request) {
@@ -55,6 +61,7 @@ public class GcsvcHandler {
 
         Timer.Sample timerSample = metrics.startTimer();
         metrics.incrementActiveRequests();
+        long startNanos = System.nanoTime();
 
         return request.bodyToMono(byte[].class)
                 .switchIfEmpty(Mono.defer(() -> {
@@ -69,6 +76,8 @@ public class GcsvcHandler {
                         extraction = extractor.extract(body);
                     } catch (Exception e) {
                         log.error("Failed to parse XML", e);
+                        history.add(new RequestRecord(Instant.now(), null, null, null, null, null, null, null,
+                                durationMs(startNanos), "Invalid XML: " + e.getMessage()));
                         return ServerResponse.badRequest()
                                 .contentType(MediaType.APPLICATION_XML)
                                 .bodyValue(errorResponseBuilder.buildErrorResponse(null, "Invalid XML: " + e.getMessage()));
@@ -102,6 +111,9 @@ public class GcsvcHandler {
                                         kv("upstream", decision.upstreamName()),
                                         kv("responseSize", responseBody.length));
                                 metrics.stopTimer(timerSample, extraction.requestType(), decision.upstreamName());
+                                history.add(new RequestRecord(Instant.now(), extraction.correlationId(), extraction.requestType(),
+                                        extraction.field("terminalName"), owner.name(), extraction.field("sbpOperType"),
+                                        decision.upstreamName(), 200, durationMs(startNanos), null));
                                 return ServerResponse.ok()
                                         .contentType(MediaType.APPLICATION_XML)
                                         .bodyValue(responseBody);
@@ -114,6 +126,9 @@ public class GcsvcHandler {
                                 metrics.recordUpstreamError(
                                         extraction.requestType(), decision.upstreamName(), ex.getClass().getSimpleName());
                                 metrics.stopTimer(timerSample, extraction.requestType(), decision.upstreamName());
+                                history.add(new RequestRecord(Instant.now(), extraction.correlationId(), extraction.requestType(),
+                                        extraction.field("terminalName"), owner.name(), extraction.field("sbpOperType"),
+                                        decision.upstreamName(), null, durationMs(startNanos), ex.getMessage()));
                                 String errorXml = errorResponseBuilder.buildErrorResponse(
                                         extraction.requestType(), ex.getMessage());
                                 return ServerResponse.ok()
@@ -123,4 +138,6 @@ public class GcsvcHandler {
                 })
                 .doFinally(signal -> metrics.decrementActiveRequests());
     }
+
+    private static long durationMs(long startNanos) { return (System.nanoTime() - startNanos) / 1_000_000; }
 }
