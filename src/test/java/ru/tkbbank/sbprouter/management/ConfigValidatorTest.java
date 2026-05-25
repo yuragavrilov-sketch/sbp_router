@@ -28,7 +28,8 @@ class ConfigValidatorTest {
     @Test void acceptsValidSnapshot() { validator.validate(validBase().build()); }
 
     @Test void rejectsMissingInfosrv() {
-        var snap = validBase().upstreams(Map.of("stub-verification", upstream("http://x/y"))).build();
+        var snap = validBase().upstreams(Map.of("stub-verification", upstream("http://x/y"),
+                "stub-connector", upstream("http://x/c"))).build();
         var ex = catchThrowableOfType(() -> validator.validate(snap), ConfigValidationException.class);
         assertThat(ex.getField()).isEqualTo("upstreams.infosrv");
     }
