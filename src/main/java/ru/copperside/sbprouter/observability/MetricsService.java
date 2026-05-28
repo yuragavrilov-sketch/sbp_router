@@ -41,5 +41,17 @@ public class MetricsService {
                 .register(registry).increment();
     }
 
+    public void recordKafkaPublished(String direction) {
+        Counter.builder("sbp_router_kafka_published_total")
+                .tag("direction", safe(direction))
+                .register(registry).increment();
+    }
+
+    public void recordKafkaPublishError(String direction) {
+        Counter.builder("sbp_router_kafka_publish_errors_total")
+                .tag("direction", safe(direction))
+                .register(registry).increment();
+    }
+
     private String safe(String value) { return value != null ? value : "unknown"; }
 }
