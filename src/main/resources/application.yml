@@ -1,23 +1,37 @@
 server:
-  port: 8080
+  port: ${SERVER_PORT:8080}
   shutdown: graceful
 
+pay:
+  environment: ${PAY_ENVIRONMENT:local}
+
 spring:
+  application:
+    name: sbp-router
+  profiles:
+    default: local
   lifecycle:
     timeout-per-shutdown-phase: 30s
-
-logging:
-  level:
-    org.springframework.web.reactive.function.server.RequestPredicates: TRACE
-    org.springframework.web.reactive.result.method: DEBUG
-    org.springframework.http.server.reactive: DEBUG
-    reactor.netty.http.server: DEBUG
+  config:
+    import:
+      - optional:configserver:${CONFIG_SERVER_URL:http://pay-config:8080}
+      - optional:vault://
+  cloud:
+    config:
+      enabled: ${CONFIG_SERVER_ENABLED:false}
+      label: ${CONFIG_SERVER_LABEL:${pay.environment}}
+    vault:
+      enabled: ${VAULT_ENABLED:false}
 
 management:
+  endpoint:
+    health:
+      probes:
+        enabled: true
   endpoints:
     web:
       exposure:
-        include: health,prometheus
+        include: health,info,metrics,prometheus
   metrics:
     tags:
       application: sbp-router
@@ -76,13 +90,6 @@ sbp-router:
 
   routing:
     tkb-pay-enabled: false
-
-  admin:
-    token: ${SBP_ADMIN_TOKEN:change-me-in-prod}
-  history:
-    capacity: 1000
-  config:
-    override-path: config/runtime-overrides.json
 
   upstreams:
     infosrv:

@@ -12,4 +12,3 @@ TCB-ENT-CA.crt
 
 # External config (environment-specific)
 config/application.yml
-config/runtime-overrides.json
