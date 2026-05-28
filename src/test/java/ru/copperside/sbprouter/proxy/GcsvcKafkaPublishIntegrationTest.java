@@ -76,8 +76,17 @@ class GcsvcKafkaPublishIntegrationTest {
                 .bodyValue(requestXml)
                 .exchange().expectStatus().isOk();
 
-        List<ConsumerRecord<String, byte[]>> records = consumeUntil(seen -> seen.stream().anyMatch(
-                r -> "request".equals(headerValue(r, "direction")) && Arrays.equals(r.value(), requestXml)));
+        List<ConsumerRecord<String, byte[]>> records = consumeUntil(seen -> {
+            ConsumerRecord<String, byte[]> r = seen.stream()
+                    .filter(x -> "request".equals(headerValue(x, "direction"))
+                            && Arrays.equals(x.value(), requestXml))
+                    .reduce((a, b) -> b).orElse(null);
+            if (r == null) {
+                return false;
+            }
+            return seen.stream().anyMatch(
+                    x -> "response".equals(headerValue(x, "direction")) && r.key().equals(x.key()));
+        });
 
         ConsumerRecord<String, byte[]> req = lastMatching(records,
                 r -> "request".equals(headerValue(r, "direction")) && Arrays.equals(r.value(), requestXml));
@@ -104,8 +113,17 @@ class GcsvcKafkaPublishIntegrationTest {
                 .bodyValue(invalid)
                 .exchange().expectStatus().isOk();
 
-        List<ConsumerRecord<String, byte[]>> records = consumeUntil(seen -> seen.stream().anyMatch(
-                r -> "request".equals(headerValue(r, "direction")) && Arrays.equals(r.value(), invalid)));
+        List<ConsumerRecord<String, byte[]>> records = consumeUntil(seen -> {
+            ConsumerRecord<String, byte[]> r = seen.stream()
+                    .filter(x -> "request".equals(headerValue(x, "direction"))
+                            && Arrays.equals(x.value(), invalid))
+                    .reduce((a, b) -> b).orElse(null);
+            if (r == null) {
+                return false;
+            }
+            return seen.stream().anyMatch(
+                    x -> "response".equals(headerValue(x, "direction")) && r.key().equals(x.key()));
+        });
 
         ConsumerRecord<String, byte[]> req = lastMatching(records,
                 r -> "request".equals(headerValue(r, "direction")) && Arrays.equals(r.value(), invalid));

@@ -80,6 +80,7 @@ public class GcsvcHandler {
                     try {
                         extraction = extractor.extract(body);
                     } catch (Exception e) {
+                        // Defensive fallback only: extract() is lenient and never throws (malformed XML is forwarded as unknown), so this is currently unreachable.
                         log.error("Failed to parse XML", e);
                         return ServerResponse.badRequest()
                                 .contentType(MediaType.APPLICATION_XML)
