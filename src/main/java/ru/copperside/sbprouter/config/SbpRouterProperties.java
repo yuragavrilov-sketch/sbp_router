@@ -14,6 +14,7 @@ public class SbpRouterProperties {
     private Terminals terminals = new Terminals();
     private Routing routing = new Routing();
     private Map<String, UpstreamConfig> upstreams;
+    private Kafka kafka = new Kafka();
 
     public Map<String, ExtractionRuleSet> getExtractionRules() { return extractionRules; }
     public void setExtractionRules(Map<String, ExtractionRuleSet> extractionRules) { this.extractionRules = extractionRules; }
@@ -23,6 +24,8 @@ public class SbpRouterProperties {
     public void setRouting(Routing routing) { this.routing = routing; }
     public Map<String, UpstreamConfig> getUpstreams() { return upstreams; }
     public void setUpstreams(Map<String, UpstreamConfig> upstreams) { this.upstreams = upstreams; }
+    public Kafka getKafka() { return kafka; }
+    public void setKafka(Kafka kafka) { this.kafka = kafka; }
 
     public static class ExtractionRuleSet {
         private List<FieldRule> routingFields;
@@ -93,6 +96,19 @@ public class SbpRouterProperties {
         public void setMaxAttempts(int maxAttempts) { this.maxAttempts = maxAttempts; }
         public Duration getBackoff() { return backoff; }
         public void setBackoff(Duration backoff) { this.backoff = backoff; }
+    }
+
+    public static class Kafka {
+        private boolean enabled = false;
+        private String bootstrapServers = "localhost:9092";
+        private String topic = "sbp-router-traffic";
+
+        public boolean isEnabled() { return enabled; }
+        public void setEnabled(boolean enabled) { this.enabled = enabled; }
+        public String getBootstrapServers() { return bootstrapServers; }
+        public void setBootstrapServers(String bootstrapServers) { this.bootstrapServers = bootstrapServers; }
+        public String getTopic() { return topic; }
+        public void setTopic(String topic) { this.topic = topic; }
     }
 
 }

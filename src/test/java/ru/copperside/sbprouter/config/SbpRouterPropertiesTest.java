@@ -49,4 +49,22 @@ class SbpRouterPropertiesTest {
         assertThat(props.getUpstreams().get("infosrv").getRetry()).isNotNull();
     }
 
+    @Test
+    void kafkaDefaultsAndAccessors() {
+        SbpRouterProperties props = new SbpRouterProperties();
+
+        // defaults
+        assertThat(props.getKafka().isEnabled()).isFalse();
+        assertThat(props.getKafka().getBootstrapServers()).isEqualTo("localhost:9092");
+        assertThat(props.getKafka().getTopic()).isEqualTo("sbp-router-traffic");
+
+        // setters
+        props.getKafka().setEnabled(true);
+        props.getKafka().setBootstrapServers("kafka:9092");
+        props.getKafka().setTopic("custom-topic");
+        assertThat(props.getKafka().isEnabled()).isTrue();
+        assertThat(props.getKafka().getBootstrapServers()).isEqualTo("kafka:9092");
+        assertThat(props.getKafka().getTopic()).isEqualTo("custom-topic");
+    }
+
 }
