@@ -23,7 +23,7 @@ public class TrafficPublisher {
 
     private static final Logger log = LoggerFactory.getLogger(TrafficPublisher.class);
 
-    private final ObjectProvider<KafkaSender<String, byte[]>> senderProvider;
+    private final KafkaSender<String, byte[]> sender; // null when Kafka disabled
     private final SbpRouterProperties properties;
     private final MetricsService metrics;
     private final String env;
@@ -32,7 +32,7 @@ public class TrafficPublisher {
                             SbpRouterProperties properties,
                             MetricsService metrics,
                             @Value("${pay.environment:local}") String env) {
-        this.senderProvider = senderProvider;
+        this.sender = senderProvider.getIfAvailable();
         this.properties = properties;
         this.metrics = metrics;
         this.env = env;
@@ -54,13 +54,12 @@ public class TrafficPublisher {
                                 String upstream, String outcome, byte[] body) {
         List<Header> headers = baseHeaders("response", txId, correlationId, requestType);
         headers.add(header("upstream", upstream != null ? upstream : "-"));
-        headers.add(header("outcome", outcome));
+        headers.add(header("outcome", outcome != null ? outcome : "unknown"));
         publish("response", txId, correlationId, body, headers);
     }
 
     private void publish(String direction, String txId, String correlationId,
                          byte[] body, List<Header> headers) {
-        KafkaSender<String, byte[]> sender = senderProvider.getIfAvailable();
         if (sender == null) {
             return; // Kafka disabled — no-op
         }
@@ -69,11 +68,11 @@ public class TrafficPublisher {
         ProducerRecord<String, byte[]> record = new ProducerRecord<>(topic, null, key, body, headers);
         sender.send(Mono.just(SenderRecord.create(record, txId)))
                 .doOnNext(result -> metrics.recordKafkaPublished(direction))
-                .doOnError(e -> {
+                .onErrorResume(e -> {
                     log.warn("Kafka publish failed direction={} key={}: {}", direction, key, e.toString());
                     metrics.recordKafkaPublishError(direction);
+                    return Mono.empty();
                 })
-                .onErrorResume(e -> Mono.empty())
                 .subscribe();
     }
 
