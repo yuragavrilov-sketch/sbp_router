@@ -24,6 +24,7 @@ public class KafkaConfig {
         props.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
         props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, ByteArraySerializer.class);
         props.put(ProducerConfig.ACKS_CONFIG, "1");
+        // Bounded so an unavailable broker fails fast instead of blocking the reactive event loop or accumulating buffers.
         props.put(ProducerConfig.MAX_BLOCK_MS_CONFIG, 5000);
         props.put(ProducerConfig.REQUEST_TIMEOUT_MS_CONFIG, 5000);
         props.put(ProducerConfig.DELIVERY_TIMEOUT_MS_CONFIG, 10000);
