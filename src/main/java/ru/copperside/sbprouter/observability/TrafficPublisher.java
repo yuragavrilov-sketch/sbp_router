@@ -1,0 +1,96 @@
+package ru.copperside.sbprouter.observability;
+
+import org.apache.kafka.clients.producer.ProducerRecord;
+import org.apache.kafka.common.header.Header;
+import org.apache.kafka.common.header.internals.RecordHeader;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
+import reactor.core.publisher.Mono;
+import reactor.kafka.sender.KafkaSender;
+import reactor.kafka.sender.SenderRecord;
+import ru.copperside.sbprouter.config.SbpRouterProperties;
+
+import java.nio.charset.StandardCharsets;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
+
+@Component
+public class TrafficPublisher {
+
+    private static final Logger log = LoggerFactory.getLogger(TrafficPublisher.class);
+
+    private final ObjectProvider<KafkaSender<String, byte[]>> senderProvider;
+    private final SbpRouterProperties properties;
+    private final MetricsService metrics;
+    private final String env;
+
+    public TrafficPublisher(ObjectProvider<KafkaSender<String, byte[]>> senderProvider,
+                            SbpRouterProperties properties,
+                            MetricsService metrics,
+                            @Value("${pay.environment:local}") String env) {
+        this.senderProvider = senderProvider;
+        this.properties = properties;
+        this.metrics = metrics;
+        this.env = env;
+    }
+
+    public void publishRequest(String txId, String correlationId, String requestType,
+                               String terminalOwner, String route, byte[] body) {
+        List<Header> headers = baseHeaders("request", txId, correlationId, requestType);
+        if (terminalOwner != null) {
+            headers.add(header("terminalOwner", terminalOwner));
+        }
+        if (route != null) {
+            headers.add(header("route", route));
+        }
+        publish("request", txId, correlationId, body, headers);
+    }
+
+    public void publishResponse(String txId, String correlationId, String requestType,
+                                String upstream, String outcome, byte[] body) {
+        List<Header> headers = baseHeaders("response", txId, correlationId, requestType);
+        headers.add(header("upstream", upstream != null ? upstream : "-"));
+        headers.add(header("outcome", outcome));
+        publish("response", txId, correlationId, body, headers);
+    }
+
+    private void publish(String direction, String txId, String correlationId,
+                         byte[] body, List<Header> headers) {
+        KafkaSender<String, byte[]> sender = senderProvider.getIfAvailable();
+        if (sender == null) {
+            return; // Kafka disabled — no-op
+        }
+        String key = correlationId != null ? correlationId : txId;
+        String topic = properties.getKafka().getTopic();
+        ProducerRecord<String, byte[]> record = new ProducerRecord<>(topic, null, key, body, headers);
+        sender.send(Mono.just(SenderRecord.create(record, txId)))
+                .doOnNext(result -> metrics.recordKafkaPublished(direction))
+                .doOnError(e -> {
+                    log.warn("Kafka publish failed direction={} key={}: {}", direction, key, e.toString());
+                    metrics.recordKafkaPublishError(direction);
+                })
+                .onErrorResume(e -> Mono.empty())
+                .subscribe();
+    }
+
+    private List<Header> baseHeaders(String direction, String txId, String correlationId, String requestType) {
+        List<Header> headers = new ArrayList<>();
+        headers.add(header("direction", direction));
+        headers.add(header("txId", txId));
+        if (correlationId != null) {
+            headers.add(header("correlationId", correlationId));
+        }
+        headers.add(header("requestType", requestType != null ? requestType : "unknown"));
+        headers.add(header("env", env));
+        headers.add(header("timestamp", Instant.now().toString()));
+        return headers;
+    }
+
+    private static Header header(String key, String value) {
+        return new RecordHeader(key, value.getBytes(StandardCharsets.UTF_8));
+    }
+}
