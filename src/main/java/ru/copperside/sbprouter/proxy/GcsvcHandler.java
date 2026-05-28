@@ -81,13 +81,9 @@ public class GcsvcHandler {
                         extraction = extractor.extract(body);
                     } catch (Exception e) {
                         log.error("Failed to parse XML", e);
-                        trafficPublisher.publishRequest(txId, null, "unknown", null, null, body);
-                        String errorXml = errorResponseBuilder.buildErrorResponse(null, "Invalid XML: " + e.getMessage());
-                        trafficPublisher.publishResponse(txId, null, "unknown", "-", "parse-error",
-                                errorXml.getBytes(StandardCharsets.UTF_8));
                         return ServerResponse.badRequest()
                                 .contentType(MediaType.APPLICATION_XML)
-                                .bodyValue(errorXml);
+                                .bodyValue(errorResponseBuilder.buildErrorResponse(null, "Invalid XML: " + e.getMessage()));
                     }
 
                     if (extraction.requestType() == null) {

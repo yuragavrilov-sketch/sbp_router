@@ -93,12 +93,16 @@ class GcsvcKafkaPublishIntegrationTest {
     }
 
     @Test
-    void publishesRawBodyAndParseErrorOnInvalidXml() {
+    void publishesRawBodyWhenUnparseableXmlIsForwarded() {
+        wireMock.stubFor(post(urlEqualTo("/api/gcsvc")).willReturn(aResponse()
+                .withStatus(200).withHeader("Content-Type", "application/xml")
+                .withBody("<Document><GCSvc><Payment><AnsAuthPay><Status><Code>0</Code></Status></AnsAuthPay></Payment></GCSvc></Document>")));
+
         byte[] invalid = "this is not xml".getBytes(StandardCharsets.UTF_8);
         webClient.post().uri("/api/gcsvc")
                 .contentType(MediaType.APPLICATION_XML)
                 .bodyValue(invalid)
-                .exchange().expectStatus().isBadRequest();
+                .exchange().expectStatus().isOk();
 
         List<ConsumerRecord<String, byte[]>> records = consumeUntil(seen -> seen.stream().anyMatch(
                 r -> "request".equals(headerValue(r, "direction")) && Arrays.equals(r.value(), invalid)));
@@ -111,8 +115,7 @@ class GcsvcKafkaPublishIntegrationTest {
         Assertions.assertNotNull(resp, "response event missing");
 
         Assertions.assertEquals("unknown", headerValue(req, "requestType"));
-        Assertions.assertNull(req.headers().lastHeader("route"));
-        Assertions.assertEquals("parse-error", headerValue(resp, "outcome"));
+        Assertions.assertEquals("success", headerValue(resp, "outcome"));
     }
 
     private List<ConsumerRecord<String, byte[]>> consumeUntil(Predicate<List<ConsumerRecord<String, byte[]>>> done) {
