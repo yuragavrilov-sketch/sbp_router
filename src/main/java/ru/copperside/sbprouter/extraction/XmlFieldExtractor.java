@@ -43,13 +43,8 @@ public class XmlFieldExtractor {
         this.properties = p;
     }
 
-    public ExtractionResult extract(byte[] xmlBytes) {
-        try {
-            return doParse(xmlBytes);
-        } catch (Exception e) {
-            log.warn("Failed to parse XML: {}", e.getMessage());
-            return new ExtractionResult(null, null, Map.of(), Map.of());
-        }
+    public ExtractionResult extract(byte[] xmlBytes) throws Exception {
+        return doParse(xmlBytes);
     }
 
     private ExtractionResult doParse(byte[] xmlBytes) throws XMLStreamException {

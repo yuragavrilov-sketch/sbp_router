@@ -15,10 +15,13 @@ import ru.copperside.sbprouter.routing.RouteDecision;
 import ru.copperside.sbprouter.routing.RoutingDecisionEngine;
 import ru.copperside.sbprouter.routing.TerminalDetector;
 import ru.copperside.sbprouter.routing.TerminalOwner;
+import ru.copperside.sbprouter.observability.TrafficPublisher;
 
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 import static net.logstash.logback.argument.StructuredArguments.kv;
@@ -37,19 +40,22 @@ public class GcsvcHandler {
     private final ProxyClient proxyClient;
     private final ErrorResponseBuilder errorResponseBuilder;
     private final MetricsService metrics;
+    private final TrafficPublisher trafficPublisher;
 
     public GcsvcHandler(XmlFieldExtractor extractor,
                         TerminalDetector terminalDetector,
                         RoutingDecisionEngine routingEngine,
                         ProxyClient proxyClient,
                         ErrorResponseBuilder errorResponseBuilder,
-                        MetricsService metrics) {
+                        MetricsService metrics,
+                        TrafficPublisher trafficPublisher) {
         this.extractor = extractor;
         this.terminalDetector = terminalDetector;
         this.routingEngine = routingEngine;
         this.proxyClient = proxyClient;
         this.errorResponseBuilder = errorResponseBuilder;
         this.metrics = metrics;
+        this.trafficPublisher = trafficPublisher;
     }
 
     public Mono<ServerResponse> handle(ServerRequest request) {
@@ -58,6 +64,7 @@ public class GcsvcHandler {
                 request.headers().contentType().orElse(null),
                 safeHeaders(request));
 
+        String txId = UUID.randomUUID().toString();
         Timer.Sample timerSample = metrics.startTimer();
         metrics.incrementActiveRequests();
 
@@ -74,9 +81,13 @@ public class GcsvcHandler {
                         extraction = extractor.extract(body);
                     } catch (Exception e) {
                         log.error("Failed to parse XML", e);
+                        trafficPublisher.publishRequest(txId, null, "unknown", null, null, body);
+                        String errorXml = errorResponseBuilder.buildErrorResponse(null, "Invalid XML: " + e.getMessage());
+                        trafficPublisher.publishResponse(txId, null, "unknown", "-", "parse-error",
+                                errorXml.getBytes(StandardCharsets.UTF_8));
                         return ServerResponse.badRequest()
                                 .contentType(MediaType.APPLICATION_XML)
-                                .bodyValue(errorResponseBuilder.buildErrorResponse(null, "Invalid XML: " + e.getMessage()));
+                                .bodyValue(errorXml);
                     }
 
                     if (extraction.requestType() == null) {
@@ -94,6 +105,8 @@ public class GcsvcHandler {
                             kv("routeDecision", decision.upstreamName()));
 
                     metrics.recordRequest(extraction.requestType(), owner.name(), decision.upstreamName());
+                    trafficPublisher.publishRequest(txId, extraction.correlationId(), extraction.requestType(),
+                            owner.name(), decision.upstreamName(), body);
 
                     Map<String, String> extraHeaders = new HashMap<>(extraction.extraFields());
                     if (extraction.correlationId() != null) {
@@ -107,6 +120,8 @@ public class GcsvcHandler {
                                         kv("upstream", decision.upstreamName()),
                                         kv("responseSize", responseBody.length));
                                 metrics.stopTimer(timerSample, extraction.requestType(), decision.upstreamName());
+                                trafficPublisher.publishResponse(txId, extraction.correlationId(),
+                                        extraction.requestType(), decision.upstreamName(), "success", responseBody);
                                 return ServerResponse.ok()
                                         .contentType(MediaType.APPLICATION_XML)
                                         .bodyValue(responseBody);
@@ -121,6 +136,9 @@ public class GcsvcHandler {
                                 metrics.stopTimer(timerSample, extraction.requestType(), decision.upstreamName());
                                 String errorXml = errorResponseBuilder.buildErrorResponse(
                                         extraction.requestType(), ex.getMessage());
+                                trafficPublisher.publishResponse(txId, extraction.correlationId(),
+                                        extraction.requestType(), decision.upstreamName(), "upstream-error",
+                                        errorXml.getBytes(StandardCharsets.UTF_8));
                                 return ServerResponse.ok()
                                         .contentType(MediaType.APPLICATION_XML)
                                         .bodyValue(errorXml);

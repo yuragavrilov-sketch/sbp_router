@@ -48,7 +48,7 @@ class XmlFieldExtractorTest {
     }
 
     @Test
-    void extractsFieldsFromB2cReqAuthPay() throws IOException {
+    void extractsFieldsFromB2cReqAuthPay() throws Exception {
         byte[] xml = loadFixture("test-xml/req-auth-pay-b2c.xml");
         ExtractionResult result = extractor.extract(xml);
 
@@ -66,7 +66,7 @@ class XmlFieldExtractorTest {
     }
 
     @Test
-    void extractsFieldsFromC2bReqAuthPay() throws IOException {
+    void extractsFieldsFromC2bReqAuthPay() throws Exception {
         byte[] xml = loadFixture("test-xml/req-auth-pay-c2b.xml");
         ExtractionResult result = extractor.extract(xml);
 
@@ -77,7 +77,7 @@ class XmlFieldExtractorTest {
     }
 
     @Test
-    void extractsFieldsFromB2cReqNoticePayConfirm() throws IOException {
+    void extractsFieldsFromB2cReqNoticePayConfirm() throws Exception {
         byte[] xml = loadFixture("test-xml/req-notice-pay-b2c-confirm.xml");
         ExtractionResult result = extractor.extract(xml);
 
@@ -91,14 +91,14 @@ class XmlFieldExtractorTest {
     }
 
     @Test
-    void extractsStateFromCancelNoticePay() throws IOException {
+    void extractsStateFromCancelNoticePay() throws Exception {
         byte[] xml = loadFixture("test-xml/req-notice-pay-b2c-cancel.xml");
         ExtractionResult result = extractor.extract(xml);
         assertThat(result.field("state")).isEqualTo("-1");
     }
 
     @Test
-    void returnsNullRequestTypeForUnknownRequest() throws IOException {
+    void returnsNullRequestTypeForUnknownRequest() throws Exception {
         byte[] xml = loadFixture("test-xml/unknown-request.xml");
         ExtractionResult result = extractor.extract(xml);
 
@@ -109,7 +109,7 @@ class XmlFieldExtractorTest {
     }
 
     @Test
-    void handlesFieldNotPresentInXml() throws IOException {
+    void handlesFieldNotPresentInXml() throws Exception {
         byte[] xml = loadFixture("test-xml/req-auth-pay-b2c.xml");
         ExtractionResult result = extractor.extract(xml);
         assertThat(result.field("rcvTspId")).isNull();
