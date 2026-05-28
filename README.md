@@ -56,6 +56,16 @@ No `bootstrap.yml` is used.
 | `VAULT_ENABLED` | Enable Vault config | `false` |
 | `INFOSRV_URL` | `infosrv` upstream URL (docker override) | baked-in default |
 
+## Traffic publishing
+
+When `sbp-router.kafka.enabled=true` (env `KAFKA_ENABLED`), the router publishes
+the raw request and response of every proxied transaction to the configured
+Kafka topic (`sbp-router.kafka.topic`, default `sbp-router-traffic`) as two
+fire-and-forget events keyed by `correlationId`/`txId`, with metadata in
+headers. Publishing never blocks or fails the proxied response; if the broker is
+unavailable the event is dropped. Metrics: `sbp_router_kafka_published_total`
+and `sbp_router_kafka_publish_errors_total` (both tagged `direction`).
+
 ## Run
 
 ### Local
