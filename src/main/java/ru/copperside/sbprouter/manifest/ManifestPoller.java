@@ -23,11 +23,14 @@ public class ManifestPoller {
     private final ManifestClient client;
     private final ManifestAdapter adapter;
     private final RoutingConfigHolder holder;
+    private final ManifestStatus status;
 
-    public ManifestPoller(ManifestClient client, ManifestAdapter adapter, RoutingConfigHolder holder) {
+    public ManifestPoller(ManifestClient client, ManifestAdapter adapter,
+                          RoutingConfigHolder holder, ManifestStatus status) {
         this.client = client;
         this.adapter = adapter;
         this.holder = holder;
+        this.status = status;
     }
 
     @Scheduled(fixedDelayString = "${sbp-router.manifest.poll-interval:30s}",
@@ -36,18 +39,22 @@ public class ManifestPoller {
         Optional<ManifestDtos.ManifestDto> latest = client.latest();
         if (latest.isEmpty()) {
             log.debug("routing manifest unavailable; keeping current snapshot");
+            status.record("UNAVAILABLE");
             return;
         }
         ManifestDtos.ManifestDto dto = latest.get();
         RoutingConfigSnapshot current = holder.current();
         if (Objects.equals(current.version(), dto.version())
                 && Objects.equals(current.checksum(), dto.checksum())) {
+            status.record("UNCHANGED");
             return;
         }
         try {
             holder.apply(adapter.toSnapshot(dto));
+            status.record("APPLIED v" + dto.version());
         } catch (Exception e) {
             log.warn("routing manifest rejected, keeping current snapshot: {}", e.toString());
+            status.record("REJECTED: " + e.getMessage());
         }
     }
 }

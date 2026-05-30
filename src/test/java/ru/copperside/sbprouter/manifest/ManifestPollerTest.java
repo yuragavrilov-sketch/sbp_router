@@ -3,6 +3,7 @@ package ru.copperside.sbprouter.manifest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import ru.copperside.sbprouter.config.SbpRouterProperties;
+import ru.copperside.sbprouter.routing.RoutingDecisionEngine;
 
 import java.util.List;
 import java.util.Map;
@@ -17,14 +18,18 @@ class ManifestPollerTest {
     private ManifestClient client;
     private RoutingConfigHolder holder;
     private ManifestPoller poller;
+    private ManifestStatus status;
 
     private ManifestDtos.ManifestDto manifest(int version, String checksum, boolean tkbEnabled) {
+        var ups = new java.util.HashMap<String, ManifestDtos.UpstreamDto>();
+        for (String name : RoutingDecisionEngine.ROUTABLE_UPSTREAMS) {
+            ups.put(name, new ManifestDtos.UpstreamDto("http://" + name, 1000, new ManifestDtos.RetryDto(1, 100)));
+        }
         var payload = new ManifestDtos.ManifestPayload(
                 Map.of(),
                 new ManifestDtos.TerminalsDto("rcvTspId", "terminalName", "Pay", List.of()),
                 Map.of("tkb-pay-enabled", String.valueOf(tkbEnabled)),
-                Map.of("infosrv", new ManifestDtos.UpstreamDto("http://u", 1000,
-                        new ManifestDtos.RetryDto(1, 100))));
+                ups);
         return new ManifestDtos.ManifestDto(version, checksum, payload);
     }
 
@@ -38,7 +43,8 @@ class ManifestPollerTest {
         p.setUpstreams(Map.of());
         p.setExtractionRules(Map.of());
         holder = new RoutingConfigHolder(p);
-        poller = new ManifestPoller(client, new ManifestAdapter(), holder);
+        status = new ManifestStatus();
+        poller = new ManifestPoller(client, new ManifestAdapter(), holder, status);
     }
 
     @Test
@@ -49,6 +55,8 @@ class ManifestPollerTest {
 
         assertThat(holder.getRouting().isTkbPayEnabled()).isTrue();
         assertThat(holder.current().version()).isEqualTo(3);
+        assertThat(status.lastOutcome()).isEqualTo("APPLIED v3");
+        assertThat(status.lastFetchAt()).isNotNull();
     }
 
     @Test
@@ -66,6 +74,7 @@ class ManifestPollerTest {
         poller.poll();
         assertThat(holder.getRouting().isTkbPayEnabled()).isFalse();
         assertThat(holder.current().version()).isNull();
+        assertThat(status.lastOutcome()).isEqualTo("UNAVAILABLE");
     }
 
     @Test
@@ -81,5 +90,6 @@ class ManifestPollerTest {
 
         assertThat(holder.getRouting().isTkbPayEnabled()).isFalse();
         assertThat(holder.current().version()).isNull();
+        assertThat(status.lastOutcome()).startsWith("REJECTED:");
     }
 }
