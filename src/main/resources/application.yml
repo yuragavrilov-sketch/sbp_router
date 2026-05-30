@@ -116,3 +116,4 @@ sbp-router:
     admin-key: ${INTERNAL_ADMIN_API_KEY:}
     poll-interval: ${MANIFEST_POLL_INTERVAL:30s}
     initial-delay: ${MANIFEST_INITIAL_DELAY:2s}
+    event-topic: ${KAFKA_MANIFEST_TOPIC:sbp-router-manifest}
