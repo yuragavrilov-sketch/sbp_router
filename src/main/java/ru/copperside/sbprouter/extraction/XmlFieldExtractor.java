@@ -5,6 +5,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import ru.copperside.sbprouter.config.SbpRouterProperties;
+import ru.copperside.sbprouter.manifest.RoutingConfigHolder;
 
 import javax.xml.stream.XMLInputFactory;
 import javax.xml.stream.XMLStreamConstants;
@@ -32,15 +33,15 @@ public class XmlFieldExtractor {
         XML_INPUT_FACTORY.setProperty(XMLInputFactory.IS_SUPPORTING_EXTERNAL_ENTITIES, false);
     }
 
-    private final SbpRouterProperties properties;
+    private final RoutingConfigHolder holder;
 
     @Autowired
-    public XmlFieldExtractor(SbpRouterProperties properties) { this.properties = properties; }
+    public XmlFieldExtractor(RoutingConfigHolder holder) { this.holder = holder; }
 
     XmlFieldExtractor(Map<String, SbpRouterProperties.ExtractionRuleSet> rules) {
         SbpRouterProperties p = new SbpRouterProperties();
         p.setExtractionRules(rules);
-        this.properties = p;
+        this.holder = new RoutingConfigHolder(p);
     }
 
     public ExtractionResult extract(byte[] xmlBytes) {
@@ -53,7 +54,7 @@ public class XmlFieldExtractor {
     }
 
     private ExtractionResult doParse(byte[] xmlBytes) throws XMLStreamException {
-        Map<String, SbpRouterProperties.ExtractionRuleSet> rules = properties.getExtractionRules();
+        Map<String, SbpRouterProperties.ExtractionRuleSet> rules = holder.getExtractionRules();
         XMLStreamReader reader = XML_INPUT_FACTORY.createXMLStreamReader(
                 new ByteArrayInputStream(xmlBytes));
 

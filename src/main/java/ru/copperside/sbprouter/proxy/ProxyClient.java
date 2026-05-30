@@ -8,6 +8,7 @@ import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 import reactor.util.retry.Retry;
 import ru.copperside.sbprouter.config.SbpRouterProperties;
+import ru.copperside.sbprouter.manifest.RoutingConfigHolder;
 import java.time.Duration;
 import java.util.Map;
 
@@ -16,14 +17,14 @@ public class ProxyClient {
     private static final Logger log = LoggerFactory.getLogger(ProxyClient.class);
 
     private final WebClient webClient;
-    private final SbpRouterProperties properties;
+    private final RoutingConfigHolder holder;
 
-    public ProxyClient(WebClient proxyWebClient, SbpRouterProperties properties) {
-        this.webClient = proxyWebClient; this.properties = properties;
+    public ProxyClient(WebClient proxyWebClient, RoutingConfigHolder holder) {
+        this.webClient = proxyWebClient; this.holder = holder;
     }
 
     public Mono<byte[]> forward(String upstreamName, byte[] body, Map<String, String> extraHeaders) {
-        Map<String, SbpRouterProperties.UpstreamConfig> upstreams = properties.getUpstreams();
+        Map<String, SbpRouterProperties.UpstreamConfig> upstreams = holder.getUpstreams();
         SbpRouterProperties.UpstreamConfig config = upstreams != null ? upstreams.get(upstreamName) : null;
         if (config == null) {
             return Mono.error(new IllegalArgumentException("Unknown upstream: " + upstreamName));

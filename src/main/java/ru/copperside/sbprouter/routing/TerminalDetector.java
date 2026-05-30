@@ -3,24 +3,25 @@ package ru.copperside.sbprouter.routing;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import ru.copperside.sbprouter.config.SbpRouterProperties;
+import ru.copperside.sbprouter.manifest.RoutingConfigHolder;
 import java.util.Map;
 import java.util.Set;
 
 @Component
 public class TerminalDetector {
-    private final SbpRouterProperties properties;
+    private final RoutingConfigHolder holder;
 
     @Autowired
-    public TerminalDetector(SbpRouterProperties properties) { this.properties = properties; }
+    public TerminalDetector(RoutingConfigHolder holder) { this.holder = holder; }
 
     TerminalDetector(SbpRouterProperties.Terminals terminals) {
         SbpRouterProperties p = new SbpRouterProperties();
         p.setTerminals(terminals);
-        this.properties = p;
+        this.holder = new RoutingConfigHolder(p);
     }
 
     public TerminalOwner detect(Map<String, String> fields) {
-        SbpRouterProperties.Terminals terminals = properties.getTerminals();
+        SbpRouterProperties.Terminals terminals = holder.getTerminals();
         java.util.List<String> rawList = terminals.getTkbPayList();
         Set<String> tkbPayList = rawList != null ? Set.copyOf(rawList) : Set.of();
         String c2bFieldName = terminals.getC2bTerminal().getFieldName();

@@ -4,6 +4,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import ru.copperside.sbprouter.config.SbpRouterProperties;
 import ru.copperside.sbprouter.extraction.ExtractionResult;
+import ru.copperside.sbprouter.manifest.RoutingConfigHolder;
 
 @Component
 public class RoutingDecisionEngine {
@@ -13,19 +14,19 @@ public class RoutingDecisionEngine {
     private static final String STUB_CONNECTOR = "stub-connector";
     private static final String C2BQRD_RCV = "C2BQRD_Rcv";
 
-    private final SbpRouterProperties properties;
+    private final RoutingConfigHolder holder;
 
     @Autowired
-    public RoutingDecisionEngine(SbpRouterProperties properties) { this.properties = properties; }
+    public RoutingDecisionEngine(RoutingConfigHolder holder) { this.holder = holder; }
 
     RoutingDecisionEngine(SbpRouterProperties.Routing routing) {
         SbpRouterProperties p = new SbpRouterProperties();
         p.setRouting(routing);
-        this.properties = p;
+        this.holder = new RoutingConfigHolder(p);
     }
 
     public RouteDecision decide(ExtractionResult extraction, TerminalOwner terminalOwner) {
-        SbpRouterProperties.Routing routing = properties.getRouting();
+        SbpRouterProperties.Routing routing = holder.getRouting();
         String requestType = extraction.requestType();
 
         if ("ReqAuthPay".equals(requestType) && C2BQRD_RCV.equals(extraction.field("sbpOperation"))) {
