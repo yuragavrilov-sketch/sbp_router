@@ -123,3 +123,20 @@ docker compose up -d --build
 ```bash
 mvn clean verify
 ```
+
+## Dynamic routing config (manifest consumption)
+
+When `DYNAMIC_ROUTING_ENABLED=true`, sbp-router periodically polls
+`sbp-router-management` for the latest compiled routing manifest and applies it to live
+routing without a restart. The static `sbp-router:` YAML remains the bootstrap baseline and
+the last-known-good fallback.
+
+| Env var | Default | Meaning |
+| --- | --- | --- |
+| `DYNAMIC_ROUTING_ENABLED` | `false` | Enable manifest polling. |
+| `SBP_ROUTER_MANAGEMENT_URL` | `http://sbp-router-management:8087` | Management base URL. |
+| `INTERNAL_ADMIN_API_KEY` | (empty) | Shared key sent as `X-Internal-Admin-Key`. |
+| `MANIFEST_POLL_INTERVAL` | `30s` | Poll interval. |
+
+Config source of truth: the manifest when enabled and reachable; otherwise the static YAML.
+On any fetch/validation failure the current snapshot is kept (no traffic interruption).
