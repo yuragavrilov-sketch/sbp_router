@@ -109,3 +109,10 @@ sbp-router:
     enabled: ${KAFKA_ENABLED:false}
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
     topic: ${KAFKA_TOPIC:sbp-router-traffic}
+
+  manifest:
+    enabled: ${DYNAMIC_ROUTING_ENABLED:false}
+    base-url: ${SBP_ROUTER_MANAGEMENT_URL:http://sbp-router-management:8087}
+    admin-key: ${INTERNAL_ADMIN_API_KEY:}
+    poll-interval: ${MANIFEST_POLL_INTERVAL:30s}
+    initial-delay: ${MANIFEST_INITIAL_DELAY:2s}
