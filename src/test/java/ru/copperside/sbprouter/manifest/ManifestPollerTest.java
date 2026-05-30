@@ -66,6 +66,7 @@ class ManifestPollerTest {
         when(client.latest()).thenReturn(Optional.of(manifest(3, "sha256:same", false)));
         poller.poll();
         assertThat(holder.getRouting().isTkbPayEnabled()).isTrue();
+        assertThat(status.lastOutcome()).isEqualTo("UNCHANGED");
     }
 
     @Test

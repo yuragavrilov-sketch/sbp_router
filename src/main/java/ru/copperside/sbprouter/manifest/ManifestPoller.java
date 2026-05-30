@@ -54,7 +54,7 @@ public class ManifestPoller {
             status.record("APPLIED v" + dto.version());
         } catch (Exception e) {
             log.warn("routing manifest rejected, keeping current snapshot: {}", e.toString());
-            status.record("REJECTED: " + e.getMessage());
+            status.record("REJECTED: " + e.toString());
         }
     }
 }
