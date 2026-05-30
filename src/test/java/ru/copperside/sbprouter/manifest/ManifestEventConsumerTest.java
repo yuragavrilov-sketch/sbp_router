@@ -30,7 +30,7 @@ import static org.mockito.Mockito.verify;
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.NONE)
 @EmbeddedKafka(partitions = 1, topics = "sbp-router-manifest")
-class ManifestEventConsumerIT {
+class ManifestEventConsumerTest {
 
     private static final String TOPIC = "sbp-router-manifest";
 
