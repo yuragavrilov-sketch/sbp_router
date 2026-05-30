@@ -11,6 +11,7 @@ import ru.copperside.sbprouter.config.SbpRouterProperties.Routing;
 import ru.copperside.sbprouter.config.SbpRouterProperties.Terminals;
 import ru.copperside.sbprouter.config.SbpRouterProperties.UpstreamConfig;
 import ru.copperside.sbprouter.extraction.FieldRule;
+import ru.copperside.sbprouter.routing.RoutingDecisionEngine;
 
 import java.time.Duration;
 import java.util.ArrayList;
@@ -134,6 +135,15 @@ public class ManifestAdapter {
     private void validate(Map<String, UpstreamConfig> upstreams, Map<String, ExtractionRuleSet> rules) {
         if (upstreams.isEmpty()) {
             throw new ManifestValidationException("manifest has no upstreams");
+        }
+        var missing = new ArrayList<String>();
+        for (String required : RoutingDecisionEngine.ROUTABLE_UPSTREAMS) {
+            if (!upstreams.containsKey(required)) {
+                missing.add(required);
+            }
+        }
+        if (!missing.isEmpty()) {
+            throw new ManifestValidationException("manifest missing required upstreams: " + missing);
         }
         rules.forEach((type, set) -> {
             List<FieldRule> all = new ArrayList<>();

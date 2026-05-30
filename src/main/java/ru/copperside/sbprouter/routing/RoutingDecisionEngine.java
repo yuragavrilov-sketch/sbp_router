@@ -6,12 +6,19 @@ import ru.copperside.sbprouter.config.SbpRouterProperties;
 import ru.copperside.sbprouter.extraction.ExtractionResult;
 import ru.copperside.sbprouter.manifest.RoutingConfigHolder;
 
+import java.util.Set;
+
 @Component
 public class RoutingDecisionEngine {
     private static final String INFOSRV = "infosrv";
     private static final String STUB_VERIFICATION = "stub-verification";
     private static final String STUB_C2BQRD_VERIFICATION = "stub-c2bqrd-verification";
     private static final String STUB_CONNECTOR = "stub-connector";
+
+    /** Upstream names this engine can route to; a manifest must define all of them. */
+    public static final Set<String> ROUTABLE_UPSTREAMS =
+            Set.of(INFOSRV, STUB_VERIFICATION, STUB_C2BQRD_VERIFICATION, STUB_CONNECTOR);
+
     private static final String C2BQRD_RCV = "C2BQRD_Rcv";
 
     private final RoutingConfigHolder holder;
