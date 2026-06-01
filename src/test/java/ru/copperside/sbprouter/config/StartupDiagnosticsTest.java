@@ -22,7 +22,7 @@ class StartupDiagnosticsTest {
                 .withProperty("server.port", "8080")
                 .withProperty(
                         "spring.config.import",
-                        "optional:configserver:http://pay-config:8080,optional:vault://"
+                        "optional:configserver:http://pay-payconfig-server:8080,optional:vault://"
                 )
                 .withProperty("spring.cloud.config.enabled", "false")
                 .withProperty("spring.cloud.vault.enabled", "false");

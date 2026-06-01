@@ -14,7 +14,7 @@ spring:
     timeout-per-shutdown-phase: 30s
   config:
     import:
-      - optional:configserver:${CONFIG_SERVER_URL:http://pay-config:8080}
+      - optional:configserver:${CONFIG_SERVER_URL:http://pay-payconfig-server:8080}
       - optional:vault://
   cloud:
     config:

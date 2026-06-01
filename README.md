@@ -50,7 +50,7 @@ No `bootstrap.yml` is used.
 | --- | --- | --- |
 | `SERVER_PORT` | HTTP port | `8080` |
 | `PAY_ENVIRONMENT` | Environment id (Config Server label, Vault path segment) | `local` |
-| `CONFIG_SERVER_URL` | Config Server base URL | `http://pay-config:8080` |
+| `CONFIG_SERVER_URL` | Config Server base URL | `http://pay-payconfig-server:8080` |
 | `CONFIG_SERVER_ENABLED` | Enable Config Server client | `false` |
 | `CONFIG_SERVER_LABEL` | Config Server label | `${pay.environment}` |
 | `VAULT_ENABLED` | Enable Vault config | `false` |
@@ -81,7 +81,7 @@ To exercise external configuration locally:
 ```powershell
 $env:CONFIG_SERVER_ENABLED='true'
 $env:VAULT_ENABLED='true'
-$env:CONFIG_SERVER_URL='http://pay-config:8080'
+$env:CONFIG_SERVER_URL='http://pay-payconfig-server:8080'
 $env:SPRING_CLOUD_VAULT_TOKEN='dev-vault-token'
 mvn spring-boot:run
 ```
