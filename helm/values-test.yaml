@@ -1,5 +1,5 @@
 image:
-  repository: harbor.online.tkbbank.ru/tkbpay/sbp-router   # TODO: must equal CI image path ($IMAGE_REGISTRY/$IMAGE_REGISTRY_PROJECT/$CI_PROJECT_NAME); tag injected by CI
+  repository: harbor.online.tkbbank.ru/tkbpay/sbp_router   # TODO: must equal CI image path ($IMAGE_REGISTRY/$IMAGE_REGISTRY_PROJECT/$CI_PROJECT_NAME); tag injected by CI
 serviceAccount:
   name: test-adapters            # TODO: confirm SA for the test namespace
 vault:
