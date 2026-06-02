@@ -1,0 +1,70 @@
+image:
+  repository: harbor.online.tkbbank.ru/tkbpay/sbp-router   # TODO: must equal CI image path ($IMAGE_REGISTRY/$IMAGE_REGISTRY_PROJECT/$CI_PROJECT_NAME); tag injected by CI
+serviceAccount:
+  name: test-adapters            # TODO: confirm SA for the test namespace
+vault:
+  enabled: false
+replicaCount: 1
+
+# Internal service (GCSvc traffic comes from an in-cluster caller) — no external ingress.
+ingress:
+  enabled: false
+
+ports:
+  - containerPort: 8080
+service:
+  name: sbp-router               # callers reach http://sbp-router:8080/api/gcsvc
+  port: 8080
+  targetPort: 8080
+
+livenessProbe:
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  httpGet:
+    path: /actuator/health
+    port: 8080
+readinessProbe:
+  initialDelaySeconds: 20
+  periodSeconds: 10
+  httpGet:
+    path: /actuator/health
+    port: 8080
+
+extraEnvs:
+  - name: SPRING_PROFILES_ACTIVE
+    value: test                  # sbp-router `test` profile (PAY_ENVIRONMENT=test, config-server on)
+  - name: SPRING_CLOUD_VAULT_ENABLED
+    value: "false"               # no secrets; overrides the test profile's vault.enabled=true
+  # --- Config Server (payconfig-server, Basic auth) ---
+  - name: CONFIG_SERVER_URL
+    value: "http://payconfig-server:8080"
+  - name: CONFIG_CLIENT_USERNAME
+    value: "configadmin"
+  # --- Kafka publishing ---
+  - name: KAFKA_ENABLED
+    value: "true"
+  - name: KAFKA_BOOTSTRAP_SERVERS
+    value: "kafka:9092"          # TODO: real corp Kafka bootstrap servers
+  - name: KAFKA_TOPIC
+    value: "sbp-router-traffic"
+  # --- Dynamic routing (sbp-router-management) ---
+  - name: DYNAMIC_ROUTING_ENABLED
+    value: "true"
+  - name: SBP_ROUTER_MANAGEMENT_URL
+    value: "http://sbp-router-management:8087"   # TODO: confirm management service deployed in test
+  - name: MANIFEST_POLL_INTERVAL
+    value: "30s"
+  # --- infosrv upstream override (else comes from config-server) ---
+  - name: SBP_ROUTER_UPSTREAMS_INFOSRV_URL
+    value: "http://infosrv.bank.local/api/gcsvc"   # TODO: real corp infosrv URL
+  # --- Secrets via pre-created k8s Secret `sbp-router-secret` ---
+  - name: CONFIG_CLIENT_PASSWORD
+    valueFrom:
+      secretKeyRef:
+        name: sbp-router-secret
+        key: CONFIG_CLIENT_PASSWORD
+  - name: INTERNAL_ADMIN_API_KEY
+    valueFrom:
+      secretKeyRef:
+        name: sbp-router-secret
+        key: INTERNAL_ADMIN_API_KEY

@@ -1,30 +1,21 @@
-# Stage 1: Build
-FROM maven:3.9-eclipse-temurin-21 AS build
+FROM harbor.online.tkbbank.ru/custom-base-images/openjre-alpine-musl:21.0.8
+RUN addgroup -S app && adduser -S -G app -h /app app
+RUN apk add --no-cache curl
+
+# Trust the corporate CA (vendored in certs/, pinned, code-reviewed) so HTTPS calls validate
+# (e.g. the infosrv upstream / corp git). Drop the corp ROOT CA (PEM) into certs/.
+COPY certs/ /usr/local/share/corp-ca/
+RUN set -eu; \
+    : "${JAVA_HOME:?JAVA_HOME must be set}"; \
+    for c in /usr/local/share/corp-ca/*.crt /usr/local/share/corp-ca/*.pem; do \
+        [ -f "$c" ] || continue; \
+        keytool -importcert -trustcacerts -noprompt -alias "corp-$(basename "$c")" \
+            -keystore "$JAVA_HOME/lib/security/cacerts" -storepass changeit -file "$c"; \
+    done
+
 WORKDIR /app
-
-# TODO: replace SSL skip with proper corporate CA certificates
-ENV MAVEN_OPTS="-Dmaven.wagon.http.ssl.insecure=true -Dmaven.wagon.http.ssl.allowall=true -Dmaven.resolver.transport=wagon"
-
-COPY pom.xml .
-RUN mvn dependency:go-offline -q
-COPY src ./src
-RUN mvn package -DskipTests -q
-
-# Stage 2: Runtime
-FROM eclipse-temurin:21-jre-alpine
-WORKDIR /app
-
-RUN addgroup -S appgroup && adduser -S appuser -G appgroup
-
-COPY --from=build /app/target/sbp-router-*.jar app.jar
-RUN mkdir -p /app/config
-
-RUN chown -R appuser:appgroup /app
-USER appuser
-
+COPY deploy/sbp-router-*.jar /app/app.jar
+RUN chown -R app:app /app
+USER app
 EXPOSE 8080
-
-HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
-  CMD wget -qO- http://localhost:8080/actuator/health || exit 1
-
-ENTRYPOINT ["java", "-jar", "app.jar"]
+ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -Djava.security.egd=file:/dev/./urandom -Duser.timezone=GMT+3 -jar /app/app.jar"]

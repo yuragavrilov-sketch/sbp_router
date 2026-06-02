@@ -1,6 +1,8 @@
 services:
   sbp-router:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile.local
     ports:
       - "8080:8080"
     volumes:

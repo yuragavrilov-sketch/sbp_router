@@ -20,6 +20,8 @@ spring:
     config:
       enabled: ${CONFIG_SERVER_ENABLED:false}
       label: ${CONFIG_SERVER_LABEL:${pay.environment}}
+      username: ${CONFIG_CLIENT_USERNAME:}
+      password: ${CONFIG_CLIENT_PASSWORD:}
     vault:
       enabled: ${VAULT_ENABLED:false}
 

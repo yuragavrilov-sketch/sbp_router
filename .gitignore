@@ -1,4 +1,5 @@
 target/
+deploy/
 *.class
 *.jar
 *.war
