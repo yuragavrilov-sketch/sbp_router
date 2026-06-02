@@ -51,23 +51,9 @@ extraEnvs:
     value: "http://payconfig-server:8080"
   - name: CONFIG_CLIENT_USERNAME
     value: "configadmin"
-  # --- Kafka publishing ---
-  - name: KAFKA_ENABLED
-    value: "true"
-  - name: KAFKA_BOOTSTRAP_SERVERS
-    value: "kafka:9092"          # TODO: real corp Kafka bootstrap servers
-  - name: KAFKA_TOPIC
-    value: "sbp-router-traffic"
-  # --- Dynamic routing (sbp-router-management) ---
-  - name: DYNAMIC_ROUTING_ENABLED
-    value: "true"
-  - name: SBP_ROUTER_MANAGEMENT_URL
-    value: "http://sbp-router-management:8087"   # TODO: confirm management service deployed in test
-  - name: MANIFEST_POLL_INTERVAL
-    value: "30s"
-  # --- infosrv upstream override (else comes from config-server) ---
-  - name: SBP_ROUTER_UPSTREAMS_INFOSRV_URL
-    value: "http://infosrv.bank.local/api/gcsvc"   # TODO: real corp infosrv URL
+  # Non-secret runtime config (Kafka, infosrv upstream, dynamic routing / manifest) comes from
+  # Config Server — config-repo branch `test`, file `sbp-router.yml`. Not set here (an env var
+  # would override Config Server).
   # Secrets are read directly from Vault (see application.yml spring.cloud.vault.kv contexts):
   #   pay/test/sbp-router-config-client-password -> spring.cloud.config.password
   #   pay/test/sbp-router-internal-admin-key     -> sbp-router.manifest.admin-key
