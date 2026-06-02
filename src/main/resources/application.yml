@@ -14,8 +14,10 @@ spring:
     timeout-per-shutdown-phase: 30s
   config:
     import:
-      - optional:configserver:${CONFIG_SERVER_URL:http://pay-payconfig-server:8080}
+      # vault before configserver: the config-client password is read from Vault and must be
+      # resolved before contacting the (Basic-auth) Config Server.
       - optional:vault://
+      - optional:configserver:${CONFIG_SERVER_URL:http://pay-payconfig-server:8080}
   cloud:
     config:
       enabled: ${CONFIG_SERVER_ENABLED:false}
@@ -24,6 +26,11 @@ spring:
       password: ${CONFIG_CLIENT_PASSWORD:}
     vault:
       enabled: ${VAULT_ENABLED:false}
+      kv:
+        backend: ${VAULT_KV_BACKEND:pay}
+        default-context: ""
+        application-name: ${VAULT_KV_CONTEXTS:${pay.environment}/${spring.application.name}-config-client-password,${pay.environment}/${spring.application.name}-internal-admin-key}
+        profiles: []
 
 management:
   endpoint:

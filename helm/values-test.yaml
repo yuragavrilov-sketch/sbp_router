@@ -1,7 +1,8 @@
 image:
   repository: harbor.online.tkbbank.ru/tkbpay/sbp_router   # TODO: must equal CI image path ($IMAGE_REGISTRY/$IMAGE_REGISTRY_PROJECT/$CI_PROJECT_NAME); tag injected by CI
 serviceAccount:
-  name: test-adapters            # TODO: confirm SA for the test namespace
+  create: true                   # chart creates a dedicated SA, bound to the Vault k8s-auth role
+  name: sbp-router
 vault:
   enabled: false
 replicaCount: 1
@@ -33,8 +34,15 @@ readinessProbe:
 extraEnvs:
   - name: SPRING_PROFILES_ACTIVE
     value: test                  # sbp-router `test` profile (PAY_ENVIRONMENT=test, config-server on)
-  - name: SPRING_CLOUD_VAULT_ENABLED
-    value: "false"               # no secrets; overrides the test profile's vault.enabled=true
+  # --- Vault: app reads secrets directly (Spring Cloud Vault, Kubernetes auth) ---
+  - name: SPRING_CLOUD_VAULT_URI
+    value: "https://vault.online.tkbbank.ru"
+  - name: SPRING_CLOUD_VAULT_AUTHENTICATION
+    value: "KUBERNETES"
+  - name: SPRING_CLOUD_VAULT_KUBERNETES_KUBERNETES_PATH
+    value: "payadmin-test"
+  - name: SPRING_CLOUD_VAULT_KUBERNETES_ROLE
+    value: "sbp-router"
   # --- Config Server (payconfig-server, Basic auth) ---
   - name: CONFIG_SERVER_URL
     value: "http://payconfig-server:8080"
@@ -57,14 +65,7 @@ extraEnvs:
   # --- infosrv upstream override (else comes from config-server) ---
   - name: SBP_ROUTER_UPSTREAMS_INFOSRV_URL
     value: "http://infosrv.bank.local/api/gcsvc"   # TODO: real corp infosrv URL
-  # --- Secrets via pre-created k8s Secret `sbp-router-secret` ---
-  - name: CONFIG_CLIENT_PASSWORD
-    valueFrom:
-      secretKeyRef:
-        name: sbp-router-secret
-        key: CONFIG_CLIENT_PASSWORD
-  - name: INTERNAL_ADMIN_API_KEY
-    valueFrom:
-      secretKeyRef:
-        name: sbp-router-secret
-        key: INTERNAL_ADMIN_API_KEY
+  # Secrets are read directly from Vault (see application.yml spring.cloud.vault.kv contexts):
+  #   pay/test/sbp-router-config-client-password -> spring.cloud.config.password
+  #   pay/test/sbp-router-internal-admin-key     -> sbp-router.manifest.admin-key
+  # No k8s Secret / secretKeyRef.
