@@ -3,6 +3,9 @@ image:
 serviceAccount:
   create: true                   # chart creates a dedicated SA, bound to the Vault k8s-auth role
   name: sbp-router
+imagePullSecrets:
+  enabled: true
+  name: test-adapters-ips        # namespace Harbor pull secret (the dedicated SA has none of its own)
 vault:
   enabled: false
 replicaCount: 1
