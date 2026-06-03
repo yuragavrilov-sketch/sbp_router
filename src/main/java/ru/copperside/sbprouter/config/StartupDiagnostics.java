@@ -68,27 +68,23 @@ public class StartupDiagnostics implements ApplicationListener<ApplicationReadyE
                 configServerLoaded, vaultLoaded);
     }
 
-    /** Logs the resolved config-client credentials, Vault wiring, and admin key (secrets masked). */
+    /**
+     * Logs whether the two secrets resolved and from which property source. Presence only — no
+     * value, no username, no length, no Vault wiring (uri/role/path are known from the deployment
+     * config; logging them would over-expose to log sinks).
+     */
     private void logExternalConfigState() {
-        log.info("Startup config-client: username={}, password={} (source={})",
-                property("spring.cloud.config.username", "(none)"),
+        log.info("Startup config-client password: {} (source={})",
                 masked(environment.getProperty("spring.cloud.config.password")),
                 sourceOf("spring.cloud.config.password"));
-        log.info("Startup vault wiring: uri={}, authentication={}, kubernetesPath={}, role={}",
-                property("spring.cloud.vault.uri", "(none)"),
-                property("spring.cloud.vault.authentication", "(none)"),
-                property("spring.cloud.vault.kubernetes.kubernetes-path", "(none)"),
-                property("spring.cloud.vault.kubernetes.role", "(none)"));
         log.info("Startup secret resolution: sbp-router.manifest.admin-key={} (source={})",
                 masked(environment.getProperty("sbp-router.manifest.admin-key")),
                 sourceOf("sbp-router.manifest.admin-key"));
     }
 
+    /** Presence only — never the value or any secret-derived detail (e.g. length). */
     private static String masked(String value) {
-        if (value == null || value.isBlank()) {
-            return "NOT-SET";
-        }
-        return "set(len=" + value.length() + ")";
+        return (value == null || value.isBlank()) ? "NOT-SET" : "SET";
     }
 
     private String sourceOf(String key) {
