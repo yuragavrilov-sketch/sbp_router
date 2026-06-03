@@ -10,9 +10,16 @@ vault:
   enabled: false
 replicaCount: 1
 
-# Internal service (GCSvc traffic comes from an in-cluster caller) — no external ingress.
+# Exposed via the corp nginx ingress for test. NOTE: /api/gcsvc has no application-level auth — the
+# GCSvc proxy accepts any caller that reaches the ingress. Acceptable only on the internal corp test
+# network; restrict before any wider exposure (whitelist-source-range, and front it with auth/mTLS).
 ingress:
-  enabled: false
+  enabled: true
+  hosts:
+    - sbp-router.test.payk8s.transcapital.com   # TODO: confirm host with the platform team
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+    # nginx.ingress.kubernetes.io/whitelist-source-range: "10.0.0.0/8"  # restrict to corp CIDRs once known
 
 ports:
   - containerPort: 8080
