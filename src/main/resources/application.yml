@@ -32,6 +32,14 @@ spring:
         application-name: ${VAULT_KV_CONTEXTS:${pay.environment}/${spring.application.name}-config-client-password,${pay.environment}/${spring.application.name}-internal-admin-key}
         profiles: []
 
+# Startup diagnostics: verbose logging for the Config Server client and Vault to see what is
+# (or isn't) fetched. Dial down via env (LOG_CONFIG_CLIENT / LOG_VAULT = INFO) once stable.
+logging:
+  level:
+    org.springframework.cloud.config: ${LOG_CONFIG_CLIENT:DEBUG}
+    org.springframework.cloud.vault: ${LOG_VAULT:DEBUG}
+    org.springframework.vault: ${LOG_VAULT:DEBUG}
+
 management:
   endpoint:
     health:

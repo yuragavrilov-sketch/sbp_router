@@ -4,7 +4,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.ApplicationListener;
+import org.springframework.core.env.ConfigurableEnvironment;
 import org.springframework.core.env.Environment;
+import org.springframework.core.env.PropertySource;
 import org.springframework.stereotype.Component;
 
 import java.util.Map;
@@ -43,6 +45,61 @@ public class StartupDiagnostics implements ApplicationListener<ApplicationReadyE
                 property("spring.cloud.vault.enabled", "false"),
                 upstreamHosts()
         );
+        logPropertySources();
+        logExternalConfigState();
+    }
+
+    /** Lists the property sources in priority order and whether Config Server / Vault sources loaded. */
+    private void logPropertySources() {
+        if (!(environment instanceof ConfigurableEnvironment ce)) {
+            return;
+        }
+        String names = ce.getPropertySources().stream()
+                .map(PropertySource::getName)
+                .collect(Collectors.joining(" | "));
+        boolean configServerLoaded = ce.getPropertySources().stream()
+                .map(ps -> ps.getName().toLowerCase())
+                .anyMatch(n -> n.contains("configserver") || n.contains("configclient"));
+        boolean vaultLoaded = ce.getPropertySources().stream()
+                .map(ps -> ps.getName().toLowerCase())
+                .anyMatch(n -> n.contains("vault"));
+        log.info("Startup property sources (priority order): {}", names);
+        log.info("Startup external sources: configServerLoaded={}, vaultLoaded={}",
+                configServerLoaded, vaultLoaded);
+    }
+
+    /** Logs the resolved config-client credentials, Vault wiring, and admin key (secrets masked). */
+    private void logExternalConfigState() {
+        log.info("Startup config-client: username={}, password={} (source={})",
+                property("spring.cloud.config.username", "(none)"),
+                masked(environment.getProperty("spring.cloud.config.password")),
+                sourceOf("spring.cloud.config.password"));
+        log.info("Startup vault wiring: uri={}, authentication={}, kubernetesPath={}, role={}",
+                property("spring.cloud.vault.uri", "(none)"),
+                property("spring.cloud.vault.authentication", "(none)"),
+                property("spring.cloud.vault.kubernetes.kubernetes-path", "(none)"),
+                property("spring.cloud.vault.kubernetes.role", "(none)"));
+        log.info("Startup secret resolution: sbp-router.manifest.admin-key={} (source={})",
+                masked(environment.getProperty("sbp-router.manifest.admin-key")),
+                sourceOf("sbp-router.manifest.admin-key"));
+    }
+
+    private static String masked(String value) {
+        if (value == null || value.isBlank()) {
+            return "NOT-SET";
+        }
+        return "set(len=" + value.length() + ")";
+    }
+
+    private String sourceOf(String key) {
+        if (environment instanceof ConfigurableEnvironment ce) {
+            for (PropertySource<?> ps : ce.getPropertySources()) {
+                if (ps.containsProperty(key)) {
+                    return ps.getName();
+                }
+            }
+        }
+        return "(none)";
     }
 
     private String profiles() {
