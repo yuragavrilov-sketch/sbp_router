@@ -60,9 +60,13 @@ public class StartupDiagnostics implements ApplicationListener<ApplicationReadyE
         boolean configServerLoaded = ce.getPropertySources().stream()
                 .map(ps -> ps.getName().toLowerCase())
                 .anyMatch(n -> n.contains("configserver") || n.contains("configclient"));
+        // Spring Cloud Vault names its property sources after the KV path (e.g. "pay/test/...") —
+        // not the literal "vault" — so match the configured KV backend prefix as well.
+        String vaultBackend = environment.getProperty("spring.cloud.vault.kv.backend", "secret")
+                .toLowerCase();
         boolean vaultLoaded = ce.getPropertySources().stream()
                 .map(ps -> ps.getName().toLowerCase())
-                .anyMatch(n -> n.contains("vault"));
+                .anyMatch(n -> n.contains("vault") || n.startsWith(vaultBackend + "/"));
         log.info("Startup property sources (priority order): {}", names);
         log.info("Startup external sources: configServerLoaded={}, vaultLoaded={}",
                 configServerLoaded, vaultLoaded);
