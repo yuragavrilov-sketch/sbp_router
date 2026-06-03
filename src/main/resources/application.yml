@@ -32,13 +32,14 @@ spring:
         application-name: ${VAULT_KV_CONTEXTS:${pay.environment}/${spring.application.name}-config-client-password,${pay.environment}/${spring.application.name}-internal-admin-key}
         profiles: []
 
-# Startup diagnostics: verbose logging for the Config Server client and Vault to see what is
-# (or isn't) fetched. Dial down via env (LOG_CONFIG_CLIENT / LOG_VAULT = INFO) once stable.
+# Default to INFO (safe). Verbose levels are opt-in via env for short-lived troubleshooting only.
+# NOTE: org.springframework.vault at DEBUG can log Vault response bodies / tokens — enable
+# LOG_VAULT=DEBUG only briefly and review logs for secret leakage before leaving it on.
 logging:
   level:
-    org.springframework.cloud.config: ${LOG_CONFIG_CLIENT:DEBUG}
-    org.springframework.cloud.vault: ${LOG_VAULT:DEBUG}
-    org.springframework.vault: ${LOG_VAULT:DEBUG}
+    org.springframework.cloud.config: ${LOG_CONFIG_CLIENT:INFO}
+    org.springframework.cloud.vault: ${LOG_VAULT:INFO}
+    org.springframework.vault: ${LOG_VAULT:INFO}
 
 management:
   endpoint:

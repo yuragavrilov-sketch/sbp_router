@@ -51,6 +51,10 @@ extraEnvs:
     value: "http://payconfig-server:8080"
   - name: CONFIG_CLIENT_USERNAME
     value: "configadmin"
+  # TEMP diagnostics: verbose Config Server client (non-secret config) to see fetch/401. Remove
+  # once startup is verified. Vault stays at INFO to avoid logging secret bodies.
+  - name: LOG_CONFIG_CLIENT
+    value: "DEBUG"
   # Non-secret runtime config (Kafka, infosrv upstream, dynamic routing / manifest) comes from
   # Config Server — config-repo branch `test`, file `sbp-router.yml`. Not set here (an env var
   # would override Config Server).
