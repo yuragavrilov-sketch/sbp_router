@@ -9,7 +9,7 @@ variables:
 
 include:
   - project: tkbpay/microservices/template
-    file: .gitlab-ci-java-21.yml
+    file: .gitlab-ci-java-21-withcert.yml
 
 helm_deploy_test:
   extends: .docker_runner
