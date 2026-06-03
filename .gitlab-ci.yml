@@ -11,37 +11,6 @@ include:
   - project: tkbpay/microservices/template
     file: .gitlab-ci-java-21.yml
 
-# Override the template's docker_build to vendor the corporate CA ($CERT) into the runtime image's
-# trust store. The template only imports $CERT into the build JDK (.maven_runner), so the final
-# alpine runtime image otherwise can't validate TLS to Vault / corp HTTPS. We write $CERT into
-# certs/ in the build context; the Dockerfile's `COPY certs/ ...` + keytool import picks it up.
-# NOTE: this is a copy of the template's docker_build job; keep it in sync if the template changes.
-docker_build:
-  extends: .docker_runner
-  stage: docker_build
-  dependencies:
-    - mvn_deploy
-  variables:
-    IMAGE_NAME: $IMAGE_REGISTRY/$IMAGE_REGISTRY_PROJECT/$CI_PROJECT_NAME
-    IMAGE_TAG: $REVISION-$CI_COMMIT_SHORT_SHA
-  before_script:
-    - export DOCKER_BUILDKIT=0
-    - export COMPOSE_DOCKER_CLI_BUILD=0
-    - if [ -z "$CERT" ]; then echo "ERROR: CERT CI/CD variable is empty in docker_build (make it project/group-scoped, not job-only)"; exit 1; fi
-    - mkdir -p certs
-    - echo "$CERT" > certs/tkbbank-ca.crt
-    - echo $IMAGE_REGISTRY_PASSWORD | docker login -u $IMAGE_REGISTRY_USERNAME --password-stdin $IMAGE_REGISTRY
-  script:
-    - export DATE="$(date +%Y%m%d%H%M)"
-    - docker build -t $IMAGE_NAME:$IMAGE_TAG -t $IMAGE_NAME:$IMAGE_TAG-$DATE -t $IMAGE_NAME:latest .
-    - docker push $IMAGE_NAME:$IMAGE_TAG
-    - docker push $IMAGE_NAME:$IMAGE_TAG-$DATE
-    - docker image rm $IMAGE_NAME:$IMAGE_TAG
-    - docker image rm $IMAGE_NAME:$IMAGE_TAG-$DATE
-    - docker image rm $IMAGE_NAME:latest
-  rules:
-    - if: $CI_COMMIT_BRANCH == "master" || $CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH =~ /^feature\/.*/ || $CI_COMMIT_BRANCH == "bug/TKBPAY-5679"
-
 helm_deploy_test:
   extends: .docker_runner
   stage: helm_deploy
