@@ -36,7 +36,13 @@ readinessProbe:
 
 extraEnvs:
   - name: SPRING_PROFILES_ACTIVE
-    value: test                  # sbp-router `test` profile (PAY_ENVIRONMENT=test, config-server on)
+    value: test                  # sbp-router `test` profile
+  # pay.environment drives the Vault KV contexts (pay/<env>/sbp-router-*) and the Config Server
+  # label. The config-data imports resolve VERY early (before the active profile is applied), so
+  # this MUST come from an env var — relying on the profile would leave it at the `local` default
+  # and Vault/Config Server would hit pay/local/... (403 from the test-scoped policy).
+  - name: PAY_ENVIRONMENT
+    value: test
   # Enable the external config-data clients (application.yml defaults both to false so the service
   # also boots standalone). Without these the optional:vault:// / optional:configserver: imports
   # are silently skipped — no property source loads.
