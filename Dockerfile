@@ -12,9 +12,14 @@ RUN set -eu; \
     imported=0; \
     for f in /usr/local/share/corp-ca/*.crt /usr/local/share/corp-ca/*.pem; do \
         [ -f "$f" ] || continue; \
-        awk 'BEGIN{n=0} /-----BEGIN CERTIFICATE-----/{n++} n>0{print > ("/tmp/corpca-" n ".pem")} /-----END CERTIFICATE-----/{if(n>0) close("/tmp/corpca-" n ".pem")}' "$f"; \
+        rm -f /tmp/corpca-*.pem; i=0; \
+        while IFS= read -r line || [ -n "$line" ]; do \
+            printf '%s\n' "$line" >> "/tmp/corpca-$i.pem"; \
+            case "$line" in *"-----END CERTIFICATE-----"*) i=$((i+1)) ;; esac; \
+        done < "$f"; \
         for c in /tmp/corpca-*.pem; do \
             [ -s "$c" ] || continue; \
+            grep -q "BEGIN CERTIFICATE" "$c" || continue; \
             keytool -importcert -trustcacerts -noprompt -alias "corp-$(basename "$f")-$imported" \
                 -keystore "$JAVA_HOME/lib/security/cacerts" -storepass changeit -file "$c"; \
             imported=$((imported+1)); \
