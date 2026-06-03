@@ -37,6 +37,13 @@ readinessProbe:
 extraEnvs:
   - name: SPRING_PROFILES_ACTIVE
     value: test                  # sbp-router `test` profile (PAY_ENVIRONMENT=test, config-server on)
+  # Enable the external config-data clients (application.yml defaults both to false so the service
+  # also boots standalone). Without these the optional:vault:// / optional:configserver: imports
+  # are silently skipped — no property source loads.
+  - name: VAULT_ENABLED
+    value: "true"
+  - name: CONFIG_SERVER_ENABLED
+    value: "true"
   # --- Vault: app reads secrets directly (Spring Cloud Vault, Kubernetes auth) ---
   - name: SPRING_CLOUD_VAULT_URI
     value: "https://vault.online.tkbbank.ru"
