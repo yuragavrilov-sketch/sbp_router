@@ -59,19 +59,29 @@ extraEnvs:
     value: "payadmin-test"
   - name: SPRING_CLOUD_VAULT_KUBERNETES_ROLE
     value: "sbp-router"
+  # Vault provides ONLY the application secret (internal-admin-key). The config-client password is
+  # a bootstrap credential and comes from a k8s Secret instead (see CONFIG_CLIENT_PASSWORD below).
+  - name: VAULT_KV_CONTEXTS
+    value: "test/sbp-router-internal-admin-key"
   # --- Config Server (payconfig-server, Basic auth) ---
   - name: CONFIG_SERVER_URL
     value: "http://payconfig-server:8080"
   - name: CONFIG_CLIENT_USERNAME
     value: "configadmin"
-  # TEMP diagnostics: verbose Config Server client (non-secret config) to see fetch/401. Remove
-  # once startup is verified. Vault stays at INFO to avoid logging secret bodies.
-  - name: LOG_CONFIG_CLIENT
-    value: "DEBUG"
+  # Bootstrap credential: the password Config Server expects. Read from the SAME k8s Secret/key that
+  # payconfig-server validates against (single source of truth — the two cannot drift). Provided as
+  # an env var (system-environment, highest precedence, present before any config-data import) so
+  # the Basic-auth call to Config Server is authenticated from the first request. A Vault-imported
+  # password was NOT reliably visible to the configserver import in this Spring Boot 4 / Cloud 2025
+  # config-data stack (it called Config Server unauthenticated -> 401), regardless of import order.
+  - name: CONFIG_CLIENT_PASSWORD
+    valueFrom:
+      secretKeyRef:
+        name: payconfig-server-secret
+        key: CONFIG_SERVER_PASSWORD
   # Non-secret runtime config (Kafka, infosrv upstream, dynamic routing / manifest) comes from
   # Config Server — config-repo branch `test`, file `sbp-router.yml`. Not set here (an env var
   # would override Config Server).
-  # Secrets are read directly from Vault (see application.yml spring.cloud.vault.kv contexts):
-  #   pay/test/sbp-router-config-client-password -> spring.cloud.config.password
-  #   pay/test/sbp-router-internal-admin-key     -> sbp-router.manifest.admin-key
-  # No k8s Secret / secretKeyRef.
+  # Secret split: application secret in Vault, bootstrap config-server credential in a k8s Secret:
+  #   pay/test/sbp-router-internal-admin-key (Vault) -> sbp-router.manifest.admin-key
+  #   payconfig-server-secret/CONFIG_SERVER_PASSWORD -> spring.cloud.config.password

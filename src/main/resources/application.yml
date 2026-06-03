@@ -13,13 +13,16 @@ spring:
   lifecycle:
     timeout-per-shutdown-phase: 30s
   config:
-    # Vault is imported here as the ONLY entry. Two imports in a single spring.config.import list are
-    # resolved together in one batch, so the configserver import would NOT see the Vault-provided
-    # spring.cloud.config.password and would call Config Server unauthenticated (401). The
-    # configserver import is therefore declared in a separate document at the end of this file: a
-    # later document's import is resolved AFTER an earlier document's import is fully loaded, so the
-    # Vault config-client password is available by the time Config Server is contacted.
-    import: optional:vault://
+    import:
+      # Vault supplies the internal-admin-key. The Config Server config-client PASSWORD is provided
+      # as the CONFIG_CLIENT_PASSWORD env var (from a k8s Secret) so it is present before Config
+      # Server is contacted: in Spring Boot 4 / Cloud 2025 config-data did NOT reliably expose a
+      # Vault-imported password to the configserver import (it ran unauthenticated -> 401),
+      # regardless of import order or splitting into separate documents. The env var sits in the
+      # system-environment source (highest precedence, available pre-import). Vault still lists the
+      # config-client-password context as a standalone fallback when the env var is absent.
+      - optional:vault://
+      - optional:configserver:${CONFIG_SERVER_URL:http://pay-payconfig-server:8080}
   cloud:
     config:
       enabled: ${CONFIG_SERVER_ENABLED:false}
@@ -137,12 +140,3 @@ sbp-router:
     poll-interval: ${MANIFEST_POLL_INTERVAL:30s}
     initial-delay: ${MANIFEST_INITIAL_DELAY:2s}
     event-topic: ${KAFKA_MANIFEST_TOPIC:sbp-router-manifest}
-
----
-# Config Server import in a SEPARATE config-data document (see the note on spring.config.import
-# above). It is resolved AFTER the Vault import in the first document is fully loaded, so the
-# config-client password Vault supplies is present and the Basic-auth call to Config Server is
-# authenticated instead of returning 401.
-spring:
-  config:
-    import: optional:configserver:${CONFIG_SERVER_URL:http://pay-payconfig-server:8080}
