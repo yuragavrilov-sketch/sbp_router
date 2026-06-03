@@ -16,7 +16,7 @@ replicaCount: 1
 ingress:
   enabled: true
   hosts:
-    - sbp-router.test.payk8s.transcapital.com   # TODO: confirm host with the platform team
+    - sbprouter.test.payk8s.transcapital.com    # host without a hyphen to avoid an ingress host collision
   annotations:
     kubernetes.io/ingress.class: "nginx"
     # nginx.ingress.kubernetes.io/whitelist-source-range: "10.0.0.0/8"  # restrict to corp CIDRs once known
