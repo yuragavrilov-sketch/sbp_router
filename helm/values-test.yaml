@@ -66,11 +66,11 @@ extraEnvs:
     value: "payadmin-test"
   - name: SPRING_CLOUD_VAULT_KUBERNETES_ROLE
     value: "sbp-router"
-  # Shared contour internal-admin-key — single Vault secret pay/test/internal-admin-key (key
-  # pay.internal-admin-api-key), mapped into sbp-router.manifest.admin-key via placeholder. The
-  # config-client password is a bootstrap credential from a k8s Secret instead (below).
+  # Shared contour admin-key — single Vault secret pay/test/sbp-router-admin-key (key
+  # sbp-router.admin-key, owner=sbp-router), mapped into sbp-router.manifest.admin-key via
+  # placeholder. The config-client password is a bootstrap credential from a k8s Secret (below).
   - name: VAULT_KV_CONTEXTS
-    value: "test/internal-admin-key"
+    value: "test/sbp-router-admin-key"
   # --- Config Server (payconfig-server, Basic auth) ---
   - name: CONFIG_SERVER_URL
     value: "http://payconfig-server:8080"
