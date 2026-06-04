@@ -34,7 +34,7 @@ spring:
       kv:
         backend: ${VAULT_KV_BACKEND:pay}
         default-context: ""
-        application-name: ${VAULT_KV_CONTEXTS:${pay.environment}/${spring.application.name}-config-client-password,${pay.environment}/${spring.application.name}-internal-admin-key}
+        application-name: ${VAULT_KV_CONTEXTS:${pay.environment}/internal-admin-key}
         profiles: []
 
 # Default to INFO (safe). Verbose levels are opt-in via env for short-lived troubleshooting only.
@@ -136,7 +136,7 @@ sbp-router:
   manifest:
     enabled: ${DYNAMIC_ROUTING_ENABLED:false}
     base-url: ${SBP_ROUTER_MANAGEMENT_URL:http://sbp-router-management:8087}
-    admin-key: ${INTERNAL_ADMIN_API_KEY:}
+    admin-key: ${pay.internal-admin-api-key:${INTERNAL_ADMIN_API_KEY:}}
     poll-interval: ${MANIFEST_POLL_INTERVAL:30s}
     initial-delay: ${MANIFEST_INITIAL_DELAY:2s}
     event-topic: ${KAFKA_MANIFEST_TOPIC:sbp-router-manifest}
