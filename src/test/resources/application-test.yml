@@ -67,7 +67,7 @@ sbp-router:
       retry:
         max-attempts: 1
         backoff: 100ms
-    stub-verification:
+    tkbpay-verification:
       url: http://localhost:${server.port}/stub/verification
-    stub-connector:
+    tkbpay-connector:
       url: http://localhost:${server.port}/stub/connector

@@ -43,7 +43,7 @@ class SbpRouterPropertiesTest {
 
     @Test
     void upstreamsConfigLoaded() {
-        assertThat(props.getUpstreams()).containsKeys("infosrv", "stub-verification", "stub-connector");
+        assertThat(props.getUpstreams()).containsKeys("infosrv", "tkbpay-verification", "tkbpay-connector");
         assertThat(props.getUpstreams().get("infosrv").getTimeout()).isNotNull();
         assertThat(props.getUpstreams().get("infosrv").getUrl()).isNotBlank();
         assertThat(props.getUpstreams().get("infosrv").getRetry()).isNotNull();

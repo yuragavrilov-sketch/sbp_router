@@ -121,11 +121,11 @@ sbp-router:
       retry:
         max-attempts: 2
         backoff: 500ms
-    stub-verification:
+    tkbpay-verification:
       url: http://localhost:${server.port}/stub/verification
-    stub-c2bqrd-verification:
+    c2bqrd-verification:
       url: http://localhost:${server.port}/stub/c2bqrd-verification
-    stub-connector:
+    tkbpay-connector:
       url: http://localhost:${server.port}/stub/connector
 
   kafka:

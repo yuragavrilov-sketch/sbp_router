@@ -18,27 +18,27 @@ class RoutingDecisionEngineTest {
     @Test void whenFlagOn_externalReqAuthPay_goesToInfosrv() {
         assertThat(buildEngine(true).decide(new ExtractionResult("ReqAuthPay", "c1", Map.of(), Map.of()), TerminalOwner.EXTERNAL).upstreamName()).isEqualTo("infosrv");
     }
-    @Test void whenFlagOn_tkbPayReqAuthPay_goesToStubVerification() {
-        assertThat(buildEngine(true).decide(new ExtractionResult("ReqAuthPay", "c1", Map.of(), Map.of()), TerminalOwner.TKB_PAY).upstreamName()).isEqualTo("stub-verification");
+    @Test void whenFlagOn_tkbPayReqAuthPay_goesToTkbpayVerification() {
+        assertThat(buildEngine(true).decide(new ExtractionResult("ReqAuthPay", "c1", Map.of(), Map.of()), TerminalOwner.TKB_PAY).upstreamName()).isEqualTo("tkbpay-verification");
     }
-    @Test void whenFlagOn_tkbPayReqNoticePayConfirm_goesToStubConnector() {
-        assertThat(buildEngine(true).decide(new ExtractionResult("ReqNoticePay", "c1", Map.of("state", "0"), Map.of()), TerminalOwner.TKB_PAY).upstreamName()).isEqualTo("stub-connector");
+    @Test void whenFlagOn_tkbPayReqNoticePayConfirm_goesToTkbpayConnector() {
+        assertThat(buildEngine(true).decide(new ExtractionResult("ReqNoticePay", "c1", Map.of("state", "0"), Map.of()), TerminalOwner.TKB_PAY).upstreamName()).isEqualTo("tkbpay-connector");
     }
-    @Test void whenFlagOn_tkbPayReqNoticePayCancel_goesToStubConnector() {
-        assertThat(buildEngine(true).decide(new ExtractionResult("ReqNoticePay", "c1", Map.of("state", "-1"), Map.of()), TerminalOwner.TKB_PAY).upstreamName()).isEqualTo("stub-connector");
+    @Test void whenFlagOn_tkbPayReqNoticePayCancel_goesToTkbpayConnector() {
+        assertThat(buildEngine(true).decide(new ExtractionResult("ReqNoticePay", "c1", Map.of("state", "-1"), Map.of()), TerminalOwner.TKB_PAY).upstreamName()).isEqualTo("tkbpay-connector");
     }
     @Test void unknownRequestType_goesToInfosrv() {
         assertThat(buildEngine(true).decide(new ExtractionResult(null, "c1", Map.of(), Map.of()), TerminalOwner.EXTERNAL).upstreamName()).isEqualTo("infosrv");
     }
-    @Test void c2bqrdRcv_alwaysGoesToStubC2bqrdVerification_evenWhenFlagOff() {
+    @Test void c2bqrdRcv_alwaysGoesToC2bqrdVerification_evenWhenFlagOff() {
         var engine = buildEngine(false);
         var extraction = new ExtractionResult("ReqAuthPay", "c1", Map.of("sbpOperation", "C2BQRD_Rcv"), Map.of());
-        assertThat(engine.decide(extraction, TerminalOwner.EXTERNAL).upstreamName()).isEqualTo("stub-c2bqrd-verification");
+        assertThat(engine.decide(extraction, TerminalOwner.EXTERNAL).upstreamName()).isEqualTo("c2bqrd-verification");
     }
-    @Test void c2bqrdRcv_alwaysGoesToStubC2bqrdVerification_tkbPay() {
+    @Test void c2bqrdRcv_alwaysGoesToC2bqrdVerification_tkbPay() {
         var engine = buildEngine(true);
         var extraction = new ExtractionResult("ReqAuthPay", "c1", Map.of("sbpOperation", "C2BQRD_Rcv"), Map.of());
-        assertThat(engine.decide(extraction, TerminalOwner.TKB_PAY).upstreamName()).isEqualTo("stub-c2bqrd-verification");
+        assertThat(engine.decide(extraction, TerminalOwner.TKB_PAY).upstreamName()).isEqualTo("c2bqrd-verification");
     }
     @Test void decisionContainsMetadata() {
         var d = buildEngine(true).decide(new ExtractionResult("ReqAuthPay", "c1", Map.of(), Map.of()), TerminalOwner.TKB_PAY);
