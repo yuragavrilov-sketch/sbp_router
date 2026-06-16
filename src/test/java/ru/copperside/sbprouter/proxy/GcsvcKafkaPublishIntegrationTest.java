@@ -48,7 +48,7 @@ class GcsvcKafkaPublishIntegrationTest {
     @DynamicPropertySource
     static void props(DynamicPropertyRegistry registry) {
         wireMock.start();
-        registry.add("sbp-router.upstreams.infosrv.url", () -> wireMock.baseUrl() + "/api/gcsvc");
+        registry.add("sbp-router.backend.url", () -> wireMock.baseUrl() + "/api/gcsvc");
         registry.add("sbp-router.kafka.enabled", () -> "true");
         registry.add("sbp-router.kafka.bootstrap-servers",
                 () -> System.getProperty("spring.embedded.kafka.brokers"));
@@ -95,10 +95,8 @@ class GcsvcKafkaPublishIntegrationTest {
                 r -> "response".equals(headerValue(r, "direction")) && req.key().equals(r.key()));
         Assertions.assertNotNull(resp, "response event missing");
 
-        Assertions.assertEquals("ReqAuthPay", headerValue(req, "requestType"));
-        Assertions.assertEquals("infosrv", headerValue(req, "route"));
+        Assertions.assertEquals("request", headerValue(req, "direction"));
         Assertions.assertEquals("success", headerValue(resp, "outcome"));
-        Assertions.assertEquals("infosrv", headerValue(resp, "upstream"));
     }
 
     @Test
@@ -132,7 +130,7 @@ class GcsvcKafkaPublishIntegrationTest {
                 r -> "response".equals(headerValue(r, "direction")) && req.key().equals(r.key()));
         Assertions.assertNotNull(resp, "response event missing");
 
-        Assertions.assertEquals("unknown", headerValue(req, "requestType"));
+        // Unparseable XML is still forwarded and published verbatim; the pair is keyed by txId.
         Assertions.assertEquals("success", headerValue(resp, "outcome"));
     }
 

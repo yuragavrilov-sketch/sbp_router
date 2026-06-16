@@ -9,11 +9,9 @@ import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 import reactor.util.retry.Retry;
 import ru.copperside.sbprouter.config.SbpRouterProperties;
-import ru.copperside.sbprouter.manifest.RoutingConfigHolder;
 
 import java.time.Duration;
 import java.util.Locale;
-import java.util.Map;
 import java.util.Set;
 
 @Component
@@ -27,44 +25,38 @@ public class ProxyClient {
             "host", "connection", "content-length", "transfer-encoding", "keep-alive",
             "te", "trailer", "upgrade", "proxy-authenticate", "proxy-authorization", "expect");
 
-    // Caller credentials are NOT forwarded to upstreams: the router authenticates to receivers on its
-    // own terms, and relaying a client's Authorization/Cookie would be a confused-deputy risk.
+    // Caller credentials are NOT forwarded to the backend: the router authenticates to the receiver on
+    // its own terms, and relaying a client's Authorization/Cookie would be a confused-deputy risk.
     private static final Set<String> STRIPPED_REQUEST_HEADERS = Set.of(
             "authorization", "cookie", "x-api-key");
 
     private final WebClient webClient;
-    private final RoutingConfigHolder holder;
+    private final SbpRouterProperties properties;
 
-    public ProxyClient(WebClient proxyWebClient, RoutingConfigHolder holder) {
+    public ProxyClient(WebClient proxyWebClient, SbpRouterProperties properties) {
         this.webClient = proxyWebClient;
-        this.holder = holder;
+        this.properties = properties;
     }
 
     /**
-     * Forwards the request body to the chosen upstream and relays its status, headers and body
-     * verbatim (transparent L7 pass-through). The router only selects the destination; it does not
-     * rewrite the payload, status or headers. Original request headers are forwarded (minus
-     * hop-by-hop); the {@code X-Sbp-*} routing metadata is added on top.
+     * Forwards the request body to the single configured backend and relays its status, headers and
+     * body verbatim (transparent L7 pass-through). The router does not rewrite payload, status or
+     * headers. Original request headers are forwarded (minus hop-by-hop and caller credentials).
      */
-    public Mono<ProxyResult> forward(String upstreamName, byte[] body, HttpHeaders requestHeaders,
-                                     Map<String, String> extraHeaders) {
-        Map<String, SbpRouterProperties.UpstreamConfig> upstreams = holder.getUpstreams();
-        SbpRouterProperties.UpstreamConfig config = upstreams != null ? upstreams.get(upstreamName) : null;
-        if (config == null) {
-            return Mono.error(new IllegalArgumentException("Unknown upstream: " + upstreamName));
+    public Mono<ProxyResult> forward(byte[] body, HttpHeaders requestHeaders) {
+        SbpRouterProperties.Backend backend = properties.getBackend();
+        if (backend == null || backend.getUrl() == null || backend.getUrl().isBlank()) {
+            return Mono.error(new IllegalStateException("Backend URL is not configured (sbp-router.backend.url)"));
         }
-        Duration timeout = config.getTimeout() != null ? config.getTimeout() : Duration.ofSeconds(30);
-        int maxAttempts = config.getRetry() != null ? config.getRetry().getMaxAttempts() : 1;
-        Duration backoff = config.getRetry() != null ? config.getRetry().getBackoff() : Duration.ofMillis(500);
+        Duration timeout = backend.getTimeout() != null ? backend.getTimeout() : Duration.ofSeconds(30);
+        int maxAttempts = backend.getRetry() != null ? backend.getRetry().getMaxAttempts() : 1;
+        Duration backoff = backend.getRetry() != null ? backend.getRetry().getBackoff() : Duration.ofMillis(500);
 
-        log.info("Forwarding to upstream={} url={} bodySize={} timeout={}s",
-                upstreamName, config.getUrl(), body.length, timeout.getSeconds());
+        log.info("Forwarding to backend url={} bodySize={} timeout={}s",
+                backend.getUrl(), body.length, timeout.getSeconds());
 
-        return webClient.post().uri(config.getUrl())
-                .headers(h -> {
-                    copyForwardable(requestHeaders, h);
-                    extraHeaders.forEach((k, v) -> h.add("X-Sbp-" + k, v));
-                })
+        return webClient.post().uri(backend.getUrl())
+                .headers(h -> copyForwardable(requestHeaders, h))
                 .bodyValue(body)
                 // exchangeToMono (not retrieve) so 4xx/5xx are relayed verbatim, not thrown.
                 .exchangeToMono(response -> response.toEntity(byte[].class))
@@ -76,9 +68,8 @@ public class ProxyClient {
                 // Retry only transport failures; an HTTP error status is a valid relayed response.
                 .retryWhen(Retry.backoff(maxAttempts, backoff)
                         .filter(ex -> !(ex instanceof java.util.concurrent.TimeoutException))
-                        .doBeforeRetry(signal -> log.warn("Retrying upstream={} attempt={}",
-                                upstreamName, signal.totalRetries() + 1)))
-                .doOnError(ex -> log.error("Upstream {} failed: {}", upstreamName, ex.getMessage()));
+                        .doBeforeRetry(signal -> log.warn("Retrying backend attempt={}", signal.totalRetries() + 1)))
+                .doOnError(ex -> log.error("Backend forward failed: {}", ex.getMessage()));
     }
 
     private static void copyForwardable(HttpHeaders src, HttpHeaders dst) {
@@ -103,7 +94,7 @@ public class ProxyClient {
         return out;
     }
 
-    /** Upstream response relayed back to the caller verbatim. */
+    /** Backend response relayed back to the caller verbatim. */
     public record ProxyResult(HttpStatusCode status, HttpHeaders headers, byte[] body) {
     }
 }

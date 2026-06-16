@@ -30,11 +30,13 @@ spring:
       username: ${CONFIG_CLIENT_USERNAME:}
       password: ${CONFIG_CLIENT_PASSWORD:}
     vault:
+      # The flat proxy has no application secret; the Vault import is kept (optional) for
+      # configuration-standard compliance and to fetch the Config Server client password if present.
       enabled: ${VAULT_ENABLED:false}
       kv:
         backend: ${VAULT_KV_BACKEND:pay}
         default-context: ""
-        application-name: ${VAULT_KV_CONTEXTS:${pay.environment}/sbp-router-admin-key}
+        application-name: ${VAULT_KV_CONTEXTS:${pay.environment}/sbp-router}
         profiles: []
 
 # Default to INFO (safe). Verbose levels are opt-in via env for short-lived troubleshooting only.
@@ -54,89 +56,21 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info,metrics,prometheus,routing-manifest
+        include: health,info,metrics,prometheus
   metrics:
     tags:
       application: sbp-router
 
 sbp-router:
-  extraction-rules:
-    ReqAuthPay:
-      routing-fields:
-        - name: terminalName
-          parent: PayProfile
-          key: Tran.TermName
-        - name: rcvTspId
-          parent: PayProfile
-          key: RcvTSPId
-        - name: sbpOperation
-          parent: PayProfile
-          key: SbpOperation
-        - name: sbpOperType
-          parent: PayProfile
-          key: SbpOperType
-      extra-fields:
-        - name: senderAccount
-          parent: PayProfile
-          key: SndAccountNum
-        - name: amount
-          path: /Document/GCSvc/Payment/ReqAuthPay/Funds/Amount
-    ReqNoticePay:
-      routing-fields:
-        - name: terminalName
-          parent: AdditionInfo
-          key: Tran.TermName
-        - name: rcvTspId
-          parent: AdditionInfo
-          key: RcvTSPId
-        - name: sbpOperation
-          parent: AdditionInfo
-          key: SbpOperation
-        - name: sbpOperType
-          parent: AdditionInfo
-          key: SbpOperType
-        - name: state
-          path: /Document/GCSvc/Payment/ReqNoticePay/State
-      extra-fields:
-        - name: bankOperId
-          path: /Document/GCSvc/Payment/ReqNoticePay/BankOperId
-
-  terminals:
-    c2b-terminal:
-      field-name: rcvTspId
-    b2c-terminal:
-      field-name: terminalName
-      tkb-pay-prefix: "Pay"
-    tkb-pay-list:
-      - MB0000700543
-      - MB0000004185
-
-  routing:
-    tkb-pay-enabled: false
-
-  upstreams:
-    infosrv:
-      url: http://infosrv.bank.local/api/gcsvc
-      timeout: 30s
-      retry:
-        max-attempts: 2
-        backoff: 500ms
-    tkbpay-verification:
-      url: http://localhost:${server.port}/stub/verification
-    c2bqrd-verification:
-      url: http://localhost:${server.port}/stub/c2bqrd-verification
-    tkbpay-connector:
-      url: http://localhost:${server.port}/stub/connector
+  # Flat pass-through proxy: every GCSvc request is forwarded to this single backend.
+  backend:
+    url: ${SBP_BACKEND_URL:http://infosrv.bank.local/api/gcsvc}
+    timeout: ${SBP_BACKEND_TIMEOUT:30s}
+    retry:
+      max-attempts: ${SBP_BACKEND_RETRY_MAX_ATTEMPTS:2}
+      backoff: ${SBP_BACKEND_RETRY_BACKOFF:500ms}
 
   kafka:
     enabled: ${KAFKA_ENABLED:false}
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
     topic: ${KAFKA_TOPIC:sbp-router-traffic}
-
-  manifest:
-    enabled: ${DYNAMIC_ROUTING_ENABLED:false}
-    base-url: ${SBP_ROUTER_MANAGEMENT_URL:http://sbp-router-management:8087}
-    admin-key: ${sbp-router.admin-key:${INTERNAL_ADMIN_API_KEY:}}
-    poll-interval: ${MANIFEST_POLL_INTERVAL:30s}
-    initial-delay: ${MANIFEST_INITIAL_DELAY:2s}
-    event-topic: ${KAFKA_MANIFEST_TOPIC:sbp-router-manifest}

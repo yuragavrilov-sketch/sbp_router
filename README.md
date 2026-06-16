@@ -1,8 +1,10 @@
 # sbp-router
 
-SBP proxy router for C2B and B2C operations. Reactive service that parses GCSvc
-XML, decides the target upstream, and forwards the request. Ships with
-Prometheus/Grafana monitoring.
+SBP flat pass-through proxy for GCSvc traffic. Reactive service that accepts a
+GCSvc request, publishes it to Kafka, forwards it verbatim to a single configured
+backend, publishes the backend response to Kafka, and relays that response back to
+the caller. No content routing — every request goes to the same backend. Ships
+with Prometheus/Grafana monitoring.
 
 ## Stack
 
@@ -19,19 +21,19 @@ Base package: `ru.copperside.sbprouter`.
 `sbp-router` follows the workspace-wide [Java microservice configuration standard](../docs/standards/java-microservice-configuration-standard.md).
 
 - `application.yml` — common defaults, `spring.config.import`, and the
-  non-secret routing/extraction/upstream configuration.
+  non-secret backend/Kafka configuration.
 - `application-local.yml` — local profile (default); disables Config Server and
   Vault unless explicitly enabled.
 - `application-test.yml` — selects the shared test environment and enables
   Config Server/Vault.
 - `application-prod.yml` — selects the production environment and enables
   Config Server/Vault.
-- `src/test/resources/application-test.yml` — routing rules and disabled
-  external sources used by automated tests.
+- `src/test/resources/application-test.yml` — disabled external sources used by
+  automated tests.
 
-Config Server provides the non-secret routing/extraction/upstream settings. The
-service currently defines no secrets; the `optional:vault://` import wiring is
-kept per the standard template so secrets can be added later without rework.
+Config Server provides the non-secret backend/Kafka settings. The service
+defines no secrets; the `optional:vault://` import wiring is kept per the
+standard template so secrets can be added later without rework.
 
 For test/prod deployments, imports should be mandatory:
 
@@ -54,17 +56,24 @@ No `bootstrap.yml` is used.
 | `CONFIG_SERVER_ENABLED` | Enable Config Server client | `false` |
 | `CONFIG_SERVER_LABEL` | Config Server label | `${pay.environment}` |
 | `VAULT_ENABLED` | Enable Vault config | `false` |
-| `INFOSRV_URL` | `infosrv` upstream URL (docker override) | baked-in default |
+| `SBP_BACKEND_URL` | Backend URL every request is proxied to | `http://infosrv.bank.local/api/gcsvc` |
+| `SBP_BACKEND_TIMEOUT` | Per-request backend timeout | `30s` |
+| `SBP_BACKEND_RETRY_MAX_ATTEMPTS` | Transport-failure retry attempts | `2` |
+| `SBP_BACKEND_RETRY_BACKOFF` | Retry backoff | `500ms` |
 
 ## Traffic publishing
 
 When `sbp-router.kafka.enabled=true` (env `KAFKA_ENABLED`), the router publishes
 the raw request and response of every proxied transaction to the configured
 Kafka topic (`sbp-router.kafka.topic`, default `sbp-router-traffic`) as two
-fire-and-forget events keyed by `correlationId`/`txId`, with metadata in
-headers. Publishing never blocks or fails the proxied response; if the broker is
-unavailable the event is dropped. Metrics: `sbp_router_kafka_published_total`
-and `sbp_router_kafka_publish_errors_total` (both tagged `direction`).
+fire-and-forget events. Each pair is keyed by the SBP `correlationId` (the `stan`
+attribute of `<Document>`), falling back to a generated `txId` when the body has
+no parseable correlation id; both events of a transaction share the same key.
+Headers carry `direction`, `txId`, `correlationId`, `env`, `timestamp`, and
+`outcome` (response only). Publishing never blocks or fails the proxied response;
+if the broker is unavailable the event is dropped. Metrics:
+`sbp_router_kafka_published_total` and `sbp_router_kafka_publish_errors_total`
+(both tagged `direction`).
 
 ## Run
 
@@ -109,8 +118,7 @@ docker compose up -d --build
 
 ## Endpoints
 
-- `POST /api/gcsvc` — main proxy entry point (GCSvc XML in, upstream XML out).
-- `POST /stub/*` — local upstream stubs for verification/connector flows.
+- `POST /api/gcsvc` — proxy entry point (GCSvc XML in, backend response out).
 
 ## Health / Observability
 
@@ -124,19 +132,7 @@ docker compose up -d --build
 mvn clean verify
 ```
 
-## Dynamic routing config (manifest consumption)
-
-When `DYNAMIC_ROUTING_ENABLED=true`, sbp-router periodically polls
-`sbp-router-management` for the latest compiled routing manifest and applies it to live
-routing without a restart. The static `sbp-router:` YAML remains the bootstrap baseline and
-the last-known-good fallback.
-
-| Env var | Default | Meaning |
-| --- | --- | --- |
-| `DYNAMIC_ROUTING_ENABLED` | `false` | Enable manifest polling. |
-| `SBP_ROUTER_MANAGEMENT_URL` | `http://sbp-router-management:8087` | Management base URL. |
-| `INTERNAL_ADMIN_API_KEY` | (empty) | Shared key sent as `X-Internal-Admin-Key`. |
-| `MANIFEST_POLL_INTERVAL` | `30s` | Poll interval. |
-
-Config source of truth: the manifest when enabled and reachable; otherwise the static YAML.
-On any fetch/validation failure the current snapshot is kept (no traffic interruption).
+> Note: content-based routing (per-payload upstream selection) and dynamic
+> manifest consumption from `sbp-router-management` were removed in favour of this
+> flat single-backend proxy. The richer routing variant is preserved on the
+> `feature/sbp-rollout` branch.

@@ -9,7 +9,6 @@ import org.springframework.core.env.Environment;
 import org.springframework.core.env.PropertySource;
 import org.springframework.stereotype.Component;
 
-import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -35,7 +34,7 @@ public class StartupDiagnostics implements ApplicationListener<ApplicationReadyE
     void logConfiguration() {
         log.info(
                 "Startup configuration: application={}, environment={}, profiles={}, serverPort={}, "
-                        + "configImports={}, configServerEnabled={}, vaultEnabled={}, upstreams={}",
+                        + "configImports={}, configServerEnabled={}, vaultEnabled={}, backend={}",
                 property("spring.application.name", "unknown"),
                 property("pay.environment", "unknown"),
                 profiles(),
@@ -43,7 +42,7 @@ public class StartupDiagnostics implements ApplicationListener<ApplicationReadyE
                 configImports(),
                 property("spring.cloud.config.enabled", "false"),
                 property("spring.cloud.vault.enabled", "false"),
-                upstreamHosts()
+                backendHost()
         );
         logPropertySources();
         logExternalConfigState();
@@ -73,17 +72,14 @@ public class StartupDiagnostics implements ApplicationListener<ApplicationReadyE
     }
 
     /**
-     * Logs whether the two secrets resolved and from which property source. Presence only — no
-     * value, no username, no length, no Vault wiring (uri/role/path are known from the deployment
-     * config; logging them would over-expose to log sinks).
+     * Logs whether the config-client password resolved and from which property source. Presence only
+     * — no value, no username, no length, no Vault wiring (uri/role/path are known from the deployment
+     * config; logging them would over-expose to log sinks). The flat proxy itself has no app secret.
      */
     private void logExternalConfigState() {
         log.info("Startup config-client password: {} (source={})",
                 masked(environment.getProperty("spring.cloud.config.password")),
                 sourceOf("spring.cloud.config.password"));
-        log.info("Startup secret resolution: sbp-router.manifest.admin-key={} (source={})",
-                masked(environment.getProperty("sbp-router.manifest.admin-key")),
-                sourceOf("sbp-router.manifest.admin-key"));
     }
 
     /** Presence only — never the value or any secret-derived detail (e.g. length). */
@@ -134,15 +130,9 @@ public class StartupDiagnostics implements ApplicationListener<ApplicationReadyE
         return environment.getProperty(name, defaultValue);
     }
 
-    private String upstreamHosts() {
-        Map<String, SbpRouterProperties.UpstreamConfig> upstreams = routerProperties.getUpstreams();
-        if (upstreams == null || upstreams.isEmpty()) {
-            return "none";
-        }
-        return upstreams.entrySet().stream()
-                .map(entry -> entry.getKey() + "=" + host(entry.getValue().getUrl()))
-                .sorted()
-                .collect(Collectors.joining(","));
+    private String backendHost() {
+        SbpRouterProperties.Backend backend = routerProperties.getBackend();
+        return backend != null ? host(backend.getUrl()) : "not-configured";
     }
 
     private static String host(String url) {

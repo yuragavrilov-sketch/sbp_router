@@ -19,24 +19,20 @@ public class MetricsService {
     public void incrementActiveRequests() { activeRequests.incrementAndGet(); }
     public void decrementActiveRequests() { activeRequests.decrementAndGet(); }
 
-    public void recordRequest(String requestType, String terminalOwner, String routeDecision) {
+    public void recordRequest() {
         Counter.builder("sbp_router_requests_total")
-                .tag("requestType", safe(requestType)).tag("terminalOwner", safe(terminalOwner))
-                .tag("routeDecision", safe(routeDecision))
                 .register(registry).increment();
     }
 
     public Timer.Sample startTimer() { return Timer.start(registry); }
 
-    public void stopTimer(Timer.Sample sample, String requestType, String routeDecision) {
+    public void stopTimer(Timer.Sample sample) {
         sample.stop(Timer.builder("sbp_router_request_duration_seconds")
-                .tag("requestType", safe(requestType)).tag("routeDecision", safe(routeDecision))
                 .register(registry));
     }
 
-    public void recordUpstreamError(String requestType, String upstream, String errorType) {
+    public void recordUpstreamError(String errorType) {
         Counter.builder("sbp_router_upstream_errors_total")
-                .tag("requestType", safe(requestType)).tag("upstream", safe(upstream))
                 .tag("errorType", safe(errorType))
                 .register(registry).increment();
     }

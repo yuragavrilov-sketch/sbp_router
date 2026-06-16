@@ -38,22 +38,13 @@ public class TrafficPublisher {
         this.env = env;
     }
 
-    public void publishRequest(String txId, String correlationId, String requestType,
-                               String terminalOwner, String route, byte[] body) {
-        List<Header> headers = baseHeaders("request", txId, correlationId, requestType);
-        if (terminalOwner != null) {
-            headers.add(header("terminalOwner", terminalOwner));
-        }
-        if (route != null) {
-            headers.add(header("route", route));
-        }
+    public void publishRequest(String txId, String correlationId, byte[] body) {
+        List<Header> headers = baseHeaders("request", txId, correlationId);
         publish("request", txId, correlationId, body, headers);
     }
 
-    public void publishResponse(String txId, String correlationId, String requestType,
-                                String upstream, String outcome, byte[] body) {
-        List<Header> headers = baseHeaders("response", txId, correlationId, requestType);
-        headers.add(header("upstream", upstream != null ? upstream : "-"));
+    public void publishResponse(String txId, String correlationId, String outcome, byte[] body) {
+        List<Header> headers = baseHeaders("response", txId, correlationId);
         headers.add(header("outcome", outcome != null ? outcome : "unknown"));
         publish("response", txId, correlationId, body, headers);
     }
@@ -76,14 +67,13 @@ public class TrafficPublisher {
                 .subscribe();
     }
 
-    private List<Header> baseHeaders(String direction, String txId, String correlationId, String requestType) {
+    private List<Header> baseHeaders(String direction, String txId, String correlationId) {
         List<Header> headers = new ArrayList<>();
         headers.add(header("direction", direction));
         headers.add(header("txId", txId));
         if (correlationId != null) {
             headers.add(header("correlationId", correlationId));
         }
-        headers.add(header("requestType", requestType != null ? requestType : "unknown"));
         headers.add(header("env", env));
         headers.add(header("timestamp", Instant.now().toString()));
         return headers;

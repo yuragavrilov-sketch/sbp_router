@@ -6,8 +6,6 @@ import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.mock.env.MockEnvironment;
 
-import java.util.Map;
-
 import static org.assertj.core.api.Assertions.assertThat;
 
 @ExtendWith(OutputCaptureExtension.class)
@@ -28,9 +26,7 @@ class StartupDiagnosticsTest {
                 .withProperty("spring.cloud.vault.enabled", "false");
 
         SbpRouterProperties routerProperties = new SbpRouterProperties();
-        SbpRouterProperties.UpstreamConfig infosrv = new SbpRouterProperties.UpstreamConfig();
-        infosrv.setUrl("http://infosrv.bank.local/api/gcsvc");
-        routerProperties.setUpstreams(Map.of("infosrv", infosrv));
+        routerProperties.getBackend().setUrl("http://infosrv.bank.local/api/gcsvc");
 
         new StartupDiagnostics(environment, routerProperties).logConfiguration();
 

@@ -9,17 +9,11 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.server.ServerRequest;
 import org.springframework.web.reactive.function.server.ServerResponse;
 import reactor.core.publisher.Mono;
-import ru.copperside.sbprouter.extraction.ExtractionResult;
-import ru.copperside.sbprouter.extraction.XmlFieldExtractor;
+import ru.copperside.sbprouter.extraction.CorrelationIdExtractor;
 import ru.copperside.sbprouter.observability.MetricsService;
-import ru.copperside.sbprouter.routing.RouteDecision;
-import ru.copperside.sbprouter.routing.RoutingDecisionEngine;
-import ru.copperside.sbprouter.routing.TerminalDetector;
-import ru.copperside.sbprouter.routing.TerminalOwner;
 import ru.copperside.sbprouter.observability.TrafficPublisher;
 
 import java.nio.charset.StandardCharsets;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -27,6 +21,11 @@ import java.util.stream.Collectors;
 
 import static net.logstash.logback.argument.StructuredArguments.kv;
 
+/**
+ * Flat GCSvc proxy: accept a request, publish it to Kafka, forward it verbatim to the single
+ * configured backend, publish the backend response to Kafka, and relay that response back to the
+ * caller. No content routing — every request goes to the same backend.
+ */
 @Component
 public class GcsvcHandler {
 
@@ -35,24 +34,18 @@ public class GcsvcHandler {
     private static final Set<String> SENSITIVE_HEADERS =
             Set.of("authorization", "cookie", "set-cookie", "proxy-authorization", "x-api-key");
 
-    private final XmlFieldExtractor extractor;
-    private final TerminalDetector terminalDetector;
-    private final RoutingDecisionEngine routingEngine;
+    private final CorrelationIdExtractor correlationIdExtractor;
     private final ProxyClient proxyClient;
     private final ErrorResponseBuilder errorResponseBuilder;
     private final MetricsService metrics;
     private final TrafficPublisher trafficPublisher;
 
-    public GcsvcHandler(XmlFieldExtractor extractor,
-                        TerminalDetector terminalDetector,
-                        RoutingDecisionEngine routingEngine,
+    public GcsvcHandler(CorrelationIdExtractor correlationIdExtractor,
                         ProxyClient proxyClient,
                         ErrorResponseBuilder errorResponseBuilder,
                         MetricsService metrics,
                         TrafficPublisher trafficPublisher) {
-        this.extractor = extractor;
-        this.terminalDetector = terminalDetector;
-        this.routingEngine = routingEngine;
+        this.correlationIdExtractor = correlationIdExtractor;
         this.proxyClient = proxyClient;
         this.errorResponseBuilder = errorResponseBuilder;
         this.metrics = metrics;
@@ -75,76 +68,43 @@ public class GcsvcHandler {
                     return Mono.empty();
                 }))
                 .flatMap(body -> {
-                    log.debug("Request body size: {} bytes", body.length);
+                    // Content-agnostic: only the correlation id is read, purely to key the Kafka pair.
+                    String correlationId = correlationIdExtractor.extract(body);
 
-                    ExtractionResult extraction;
-                    try {
-                        extraction = extractor.extract(body);
-                    } catch (Exception e) {
-                        // Defensive fallback only: extract() is lenient and never throws (malformed XML is forwarded as unknown), so this is currently unreachable.
-                        log.error("Failed to parse XML", e);
-                        return ServerResponse.badRequest()
-                                .contentType(MediaType.APPLICATION_XML)
-                                .bodyValue(errorResponseBuilder.buildErrorResponse(null, "Invalid XML: " + e.getMessage()));
-                    }
+                    log.info("Proxying request",
+                            kv("correlationId", correlationId),
+                            kv("bodySize", body.length));
 
-                    if (extraction.requestType() == null) {
-                        log.warn("Unknown request type in XML, correlationId={}",
-                                extraction.correlationId());
-                    }
+                    metrics.recordRequest();
+                    trafficPublisher.publishRequest(txId, correlationId, body);
 
-                    TerminalOwner owner = terminalDetector.detect(extraction.fields());
-                    RouteDecision decision = routingEngine.decide(extraction, owner);
-
-                    log.info("Routing request",
-                            kv("correlationId", extraction.correlationId()),
-                            kv("requestType", extraction.requestType()),
-                            kv("terminalOwner", owner.name()),
-                            kv("routeDecision", decision.upstreamName()));
-
-                    metrics.recordRequest(extraction.requestType(), owner.name(), decision.upstreamName());
-                    trafficPublisher.publishRequest(txId, extraction.correlationId(), extraction.requestType(),
-                            owner.name(), decision.upstreamName(), body);
-
-                    Map<String, String> extraHeaders = new HashMap<>(extraction.extraFields());
-                    if (extraction.correlationId() != null) {
-                        extraHeaders.put("correlationId", extraction.correlationId());
-                    }
-
-                    return proxyClient.forward(decision.upstreamName(), body,
-                                    request.headers().asHttpHeaders(), extraHeaders)
+                    return proxyClient.forward(body, request.headers().asHttpHeaders())
                             .flatMap(result -> {
-                                log.info("Upstream response received",
-                                        kv("correlationId", extraction.correlationId()),
-                                        kv("upstream", decision.upstreamName()),
+                                log.info("Backend response received",
+                                        kv("correlationId", correlationId),
                                         kv("status", result.status().value()),
                                         kv("responseSize", result.body().length));
-                                metrics.stopTimer(timerSample, extraction.requestType(), decision.upstreamName());
+                                metrics.stopTimer(timerSample);
                                 String outcome = result.status().is2xxSuccessful()
-                                        ? "success" : "upstream-status-" + result.status().value();
-                                trafficPublisher.publishResponse(txId, extraction.correlationId(),
-                                        extraction.requestType(), decision.upstreamName(), outcome, result.body());
-                                // Transparent relay: upstream status + headers + body verbatim.
+                                        ? "success" : "backend-status-" + result.status().value();
+                                trafficPublisher.publishResponse(txId, correlationId, outcome, result.body());
+                                // Transparent relay: backend status + headers + body verbatim.
                                 return ServerResponse.status(result.status())
                                         .headers(h -> h.addAll(result.headers()))
                                         .bodyValue(result.body());
                             })
                             .onErrorResume(ex -> {
-                                // No HTTP response from upstream (connection refused/reset/timeout):
-                                // synthesize a gateway error, since there is no upstream status to relay.
-                                log.error("Upstream transport error",
-                                        kv("correlationId", extraction.correlationId()),
-                                        kv("upstream", decision.upstreamName()),
+                                // No HTTP response from the backend (connection refused/reset/timeout):
+                                // synthesize a gateway error, since there is no backend status to relay.
+                                log.error("Backend transport error",
+                                        kv("correlationId", correlationId),
                                         kv("error", ex.getMessage()));
-                                metrics.recordUpstreamError(
-                                        extraction.requestType(), decision.upstreamName(), ex.getClass().getSimpleName());
-                                metrics.stopTimer(timerSample, extraction.requestType(), decision.upstreamName());
+                                metrics.recordUpstreamError(ex.getClass().getSimpleName());
+                                metrics.stopTimer(timerSample);
                                 HttpStatus status = ex instanceof java.util.concurrent.TimeoutException
                                         ? HttpStatus.GATEWAY_TIMEOUT : HttpStatus.BAD_GATEWAY;
-                                String errorXml = errorResponseBuilder.buildErrorResponse(
-                                        extraction.requestType(), ex.getMessage());
-                                trafficPublisher.publishResponse(txId, extraction.correlationId(),
-                                        extraction.requestType(), decision.upstreamName(), "upstream-error",
+                                String errorXml = errorResponseBuilder.buildErrorResponse(null, ex.getMessage());
+                                trafficPublisher.publishResponse(txId, correlationId, "backend-error",
                                         errorXml.getBytes(StandardCharsets.UTF_8));
                                 return ServerResponse.status(status)
                                         .contentType(MediaType.APPLICATION_XML)

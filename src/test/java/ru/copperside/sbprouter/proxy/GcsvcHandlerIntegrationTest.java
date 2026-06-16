@@ -28,7 +28,7 @@ class GcsvcHandlerIntegrationTest {
     @DynamicPropertySource
     static void configureUpstream(DynamicPropertyRegistry registry) {
         wireMock.start();
-        registry.add("sbp-router.upstreams.infosrv.url", () -> wireMock.baseUrl() + "/api/gcsvc");
+        registry.add("sbp-router.backend.url", () -> wireMock.baseUrl() + "/api/gcsvc");
     }
 
     @AfterAll
@@ -104,7 +104,7 @@ class GcsvcHandlerIntegrationTest {
     }
 
     @Test
-    void forwardsExtraFieldsAsHeaders() throws IOException {
+    void forwardsOriginalRequestBodyVerbatimToBackend() throws IOException {
         wireMock.stubFor(post(urlEqualTo("/api/gcsvc"))
                 .willReturn(aResponse()
                         .withStatus(200)
@@ -121,9 +121,9 @@ class GcsvcHandlerIntegrationTest {
                 .exchange()
                 .expectStatus().isOk();
 
+        // Flat proxy: the body is relayed unchanged, no payload-derived X-Sbp-* enrichment.
         wireMock.verify(postRequestedFor(urlEqualTo("/api/gcsvc"))
-                .withHeader("X-Sbp-senderAccount", equalTo("40702810820100004437"))
-                .withHeader("X-Sbp-amount", equalTo("15787")));
+                .withRequestBody(binaryEqualTo(requestXml)));
     }
 
     @Test

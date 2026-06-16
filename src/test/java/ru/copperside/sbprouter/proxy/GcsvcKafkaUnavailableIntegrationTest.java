@@ -29,7 +29,7 @@ class GcsvcKafkaUnavailableIntegrationTest {
     @DynamicPropertySource
     static void props(DynamicPropertyRegistry registry) {
         wireMock.start();
-        registry.add("sbp-router.upstreams.infosrv.url", () -> wireMock.baseUrl() + "/api/gcsvc");
+        registry.add("sbp-router.backend.url", () -> wireMock.baseUrl() + "/api/gcsvc");
         registry.add("sbp-router.kafka.enabled", () -> "true");
         // Unreachable broker: nothing listens on this port.
         registry.add("sbp-router.kafka.bootstrap-servers", () -> "localhost:1");

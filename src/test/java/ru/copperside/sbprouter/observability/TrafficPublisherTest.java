@@ -55,7 +55,7 @@ class TrafficPublisherTest {
         TrafficPublisher publisher = publisherWith(sender);
 
         byte[] body = "<xml/>".getBytes(StandardCharsets.UTF_8);
-        publisher.publishRequest("tx-1", "corr-1", "ReqAuthPay", "EXTERNAL", "infosrv", body);
+        publisher.publishRequest("tx-1", "corr-1", body);
 
         ArgumentCaptor<Mono<SenderRecord<String, byte[], String>>> captor = ArgumentCaptor.forClass(Mono.class);
         verify(sender).send(captor.capture());
@@ -68,24 +68,20 @@ class TrafficPublisherTest {
         assertThat(headerValue(record, "direction")).isEqualTo("request");
         assertThat(headerValue(record, "txId")).isEqualTo("tx-1");
         assertThat(headerValue(record, "correlationId")).isEqualTo("corr-1");
-        assertThat(headerValue(record, "requestType")).isEqualTo("ReqAuthPay");
-        assertThat(headerValue(record, "terminalOwner")).isEqualTo("EXTERNAL");
-        assertThat(headerValue(record, "route")).isEqualTo("infosrv");
         assertThat(headerValue(record, "env")).isEqualTo("compose");
         assertThat(headerValue(record, "timestamp")).isNotBlank();
     }
 
     @Test
-    void responseRecordHasUpstreamAndOutcome() {
+    void responseRecordHasOutcome() {
         KafkaSender<String, byte[]> sender = senderReturning(Flux.empty());
         TrafficPublisher publisher = publisherWith(sender);
 
-        publisher.publishResponse("tx-2", "corr-2", "ReqNoticePay", "infosrv", "success",
+        publisher.publishResponse("tx-2", "corr-2", "success",
                 "<ok/>".getBytes(StandardCharsets.UTF_8));
 
         ProducerRecord<String, byte[]> record = capturedRecord(sender);
         assertThat(headerValue(record, "direction")).isEqualTo("response");
-        assertThat(headerValue(record, "upstream")).isEqualTo("infosrv");
         assertThat(headerValue(record, "outcome")).isEqualTo("success");
         assertThat(record.key()).isEqualTo("corr-2");
     }
@@ -95,15 +91,11 @@ class TrafficPublisherTest {
         KafkaSender<String, byte[]> sender = senderReturning(Flux.empty());
         TrafficPublisher publisher = publisherWith(sender);
 
-        publisher.publishRequest("tx-3", null, null, null, null,
-                "<bad".getBytes(StandardCharsets.UTF_8));
+        publisher.publishRequest("tx-3", null, "<bad".getBytes(StandardCharsets.UTF_8));
 
         ProducerRecord<String, byte[]> record = capturedRecord(sender);
         assertThat(record.key()).isEqualTo("tx-3");
-        assertThat(headerValue(record, "requestType")).isEqualTo("unknown");
         assertThat(record.headers().lastHeader("correlationId")).isNull();
-        assertThat(record.headers().lastHeader("terminalOwner")).isNull();
-        assertThat(record.headers().lastHeader("route")).isNull();
     }
 
     @Test
@@ -111,7 +103,7 @@ class TrafficPublisherTest {
         KafkaSender<String, byte[]> sender = senderReturning(Flux.error(new RuntimeException("broker down")));
         TrafficPublisher publisher = publisherWith(sender);
 
-        assertThatCode(() -> publisher.publishResponse("tx-4", "c", "ReqAuthPay", "infosrv", "success",
+        assertThatCode(() -> publisher.publishResponse("tx-4", "c", "success",
                 "<x/>".getBytes(StandardCharsets.UTF_8))).doesNotThrowAnyException();
 
         assertThat(registry.get("sbp_router_kafka_publish_errors_total")
@@ -122,7 +114,7 @@ class TrafficPublisherTest {
     void noOpWhenSenderAbsent() {
         TrafficPublisher publisher = publisherWith(null);
 
-        assertThatCode(() -> publisher.publishRequest("tx-5", "c", "ReqAuthPay", "EXTERNAL", "infosrv",
+        assertThatCode(() -> publisher.publishRequest("tx-5", "c",
                 "<x/>".getBytes(StandardCharsets.UTF_8))).doesNotThrowAnyException();
         assertThat(registry.find("sbp_router_kafka_published_total").counter()).isNull();
     }
