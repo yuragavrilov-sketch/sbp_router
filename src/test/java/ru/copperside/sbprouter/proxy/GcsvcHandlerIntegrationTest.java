@@ -28,7 +28,7 @@ class GcsvcHandlerIntegrationTest {
     @DynamicPropertySource
     static void configureUpstream(DynamicPropertyRegistry registry) {
         wireMock.start();
-        registry.add("sbp-router.backend.url", () -> wireMock.baseUrl() + "/api/gcsvc");
+        registry.add("sbp-router.groups.default.backends[0]", () -> wireMock.baseUrl() + "/api/gcsvc");
     }
 
     @AfterAll

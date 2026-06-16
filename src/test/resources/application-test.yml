@@ -6,11 +6,15 @@ spring:
       enabled: false
 
 sbp-router:
-  # Integration tests override sbp-router.backend.url via @DynamicPropertySource (WireMock).
-  # This default keeps the context loadable for context-only tests; it points nowhere reachable.
-  backend:
-    url: http://localhost:9999/api/gcsvc
-    timeout: 5s
-    retry:
-      max-attempts: 1
-      backoff: 100ms
+  # Integration tests override sbp-router.groups.default.backends via @DynamicPropertySource.
+  active-group: default
+  groups:
+    default:
+      backends:
+        - http://localhost:9099/api/gcsvc
+  timeout: 5s
+  failover:
+    max-attempts: 2
+  circuit-breaker:
+    failure-threshold: 3
+    ban-duration: 5s
