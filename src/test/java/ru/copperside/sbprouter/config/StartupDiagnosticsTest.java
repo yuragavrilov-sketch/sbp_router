@@ -26,7 +26,10 @@ class StartupDiagnosticsTest {
                 .withProperty("spring.cloud.vault.enabled", "false");
 
         SbpRouterProperties routerProperties = new SbpRouterProperties();
-        routerProperties.getBackend().setUrl("http://infosrv.bank.local/api/gcsvc");
+        SbpRouterProperties.Group g = new SbpRouterProperties.Group();
+        g.setBackends(java.util.List.of("http://infosrv.bank.local/api/gcsvc"));
+        routerProperties.setActiveGroup("default");
+        routerProperties.getGroups().put("default", g);
 
         new StartupDiagnostics(environment, routerProperties).logConfiguration();
 
@@ -35,6 +38,7 @@ class StartupDiagnosticsTest {
                 .contains("local")
                 .contains("configserver")
                 .contains("vault")
-                .contains("infosrv.bank.local");
+                .contains("infosrv.bank.local")
+                .contains("default");
     }
 }
