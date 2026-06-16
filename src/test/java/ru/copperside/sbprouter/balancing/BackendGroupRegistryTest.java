@@ -32,19 +32,12 @@ class BackendGroupRegistryTest {
     }
 
     @Test
-    void switchesActiveGroup() {
-        BackendGroupRegistry r = new BackendGroupRegistry(props("a",
-                Map.of("a", List.of("http://a/api"), "b", List.of("http://b/api"))));
-        r.setActiveGroup("b");
-        assertThat(r.activeGroupName()).isEqualTo("b");
-        assertThat(r.activeGroup().backends().get(0).url()).isEqualTo("http://b/api");
-    }
-
-    @Test
-    void unknownGroupSwitchThrows() {
+    void replaceRejectsActiveGroupNotInNewGroups() {
         BackendGroupRegistry r = new BackendGroupRegistry(
                 props("default", Map.of("default", List.of("http://a/api"))));
-        assertThatThrownBy(() -> r.setActiveGroup("nope"))
+        Map<String, BackendGroup> groups = Map.of("dr",
+                new BackendGroup("dr", List.of(new Backend("http://b/api", new BackendHealth()))));
+        assertThatThrownBy(() -> r.replace(groups, "nope", 2L))
                 .isInstanceOf(IllegalArgumentException.class);
         assertThat(r.activeGroupName()).isEqualTo("default"); // unchanged
     }
