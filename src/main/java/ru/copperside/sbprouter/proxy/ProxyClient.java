@@ -7,69 +7,89 @@ import org.springframework.http.HttpStatusCode;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
-import reactor.util.retry.Retry;
+import ru.copperside.sbprouter.balancing.AllBackendsFailedException;
+import ru.copperside.sbprouter.balancing.Backend;
+import ru.copperside.sbprouter.balancing.BackendGroup;
+import ru.copperside.sbprouter.balancing.BackendGroupRegistry;
+import ru.copperside.sbprouter.balancing.LoadBalancer;
 import ru.copperside.sbprouter.config.SbpRouterProperties;
 
+import java.time.Clock;
 import java.time.Duration;
+import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import java.util.concurrent.TimeoutException;
 
 @Component
 public class ProxyClient {
     private static final Logger log = LoggerFactory.getLogger(ProxyClient.class);
 
-    // Hop-by-hop headers a proxy must not forward (RFC 7230 §6.1), plus Host/Content-Length which the
-    // client connector derives from the target URI / body. Applied to both forwarded request headers
-    // and relayed response headers so the proxy stays transparent without corrupting framing.
     private static final Set<String> HOP_BY_HOP = Set.of(
             "host", "connection", "content-length", "transfer-encoding", "keep-alive",
             "te", "trailer", "upgrade", "proxy-authenticate", "proxy-authorization", "expect");
 
-    // Caller credentials are NOT forwarded to the backend: the router authenticates to the receiver on
-    // its own terms, and relaying a client's Authorization/Cookie would be a confused-deputy risk.
     private static final Set<String> STRIPPED_REQUEST_HEADERS = Set.of(
             "authorization", "cookie", "x-api-key");
 
     private final WebClient webClient;
     private final SbpRouterProperties properties;
+    private final BackendGroupRegistry registry;
+    private final LoadBalancer loadBalancer;
+    private final Clock clock;
 
-    public ProxyClient(WebClient proxyWebClient, SbpRouterProperties properties) {
+    public ProxyClient(WebClient proxyWebClient, SbpRouterProperties properties,
+                       BackendGroupRegistry registry, LoadBalancer loadBalancer, Clock clock) {
         this.webClient = proxyWebClient;
         this.properties = properties;
+        this.registry = registry;
+        this.loadBalancer = loadBalancer;
+        this.clock = clock;
     }
 
     /**
-     * Forwards the request body to the single configured backend and relays its status, headers and
-     * body verbatim (transparent L7 pass-through). The router does not rewrite payload, status or
-     * headers. Original request headers are forwarded (minus hop-by-hop and caller credentials).
+     * Forwards the request to the active group: round-robin across healthy backends, failing over to
+     * the next on a transport error, up to {@code failover.max-attempts} distinct backends. The first
+     * backend that returns any HTTP response wins and its status/headers/body are relayed verbatim.
      */
     public Mono<ProxyResult> forward(byte[] body, HttpHeaders requestHeaders) {
-        SbpRouterProperties.Backend backend = properties.getBackend();
-        if (backend == null || backend.getUrl() == null || backend.getUrl().isBlank()) {
-            return Mono.error(new IllegalStateException("Backend URL is not configured (sbp-router.backend.url)"));
+        BackendGroup group = registry.activeGroup();
+        List<Backend> candidates = loadBalancer.selectCandidates(group);
+        int k = Math.max(1, properties.getFailover().getMaxAttempts());
+        int limit = Math.min(k, candidates.size());
+        Duration timeout = properties.getTimeout() != null ? properties.getTimeout() : Duration.ofSeconds(30);
+        int threshold = properties.getCircuitBreaker().getFailureThreshold();
+        long banMs = properties.getCircuitBreaker().getBanDuration().toMillis();
+        return attempt(candidates, 0, limit, body, requestHeaders, timeout, threshold, banMs, false);
+    }
+
+    private Mono<ProxyResult> attempt(List<Backend> candidates, int idx, int limit, byte[] body,
+                                      HttpHeaders requestHeaders, Duration timeout, int threshold,
+                                      long banMs, boolean lastWasTimeout) {
+        if (idx >= limit) {
+            return Mono.error(new AllBackendsFailedException(lastWasTimeout));
         }
-        Duration timeout = backend.getTimeout() != null ? backend.getTimeout() : Duration.ofSeconds(30);
-        int maxAttempts = backend.getRetry() != null ? backend.getRetry().getMaxAttempts() : 1;
-        Duration backoff = backend.getRetry() != null ? backend.getRetry().getBackoff() : Duration.ofMillis(500);
-
-        log.info("Forwarding to backend url={} bodySize={} timeout={}s",
-                backend.getUrl(), body.length, timeout.getSeconds());
-
-        return webClient.post().uri(backend.getUrl())
+        Backend backend = candidates.get(idx);
+        return webClient.post().uri(backend.url())
                 .headers(h -> copyForwardable(requestHeaders, h))
                 .bodyValue(body)
-                // exchangeToMono (not retrieve) so 4xx/5xx are relayed verbatim, not thrown.
                 .exchangeToMono(response -> response.toEntity(byte[].class))
-                .map(entity -> new ProxyResult(
-                        entity.getStatusCode(),
-                        stripHopByHop(entity.getHeaders()),
-                        entity.getBody() != null ? entity.getBody() : new byte[0]))
                 .timeout(timeout)
-                // Retry only transport failures; an HTTP error status is a valid relayed response.
-                .retryWhen(Retry.backoff(maxAttempts, backoff)
-                        .filter(ex -> !(ex instanceof java.util.concurrent.TimeoutException))
-                        .doBeforeRetry(signal -> log.warn("Retrying backend attempt={}", signal.totalRetries() + 1)))
-                .doOnError(ex -> log.error("Backend forward failed: {}", ex.getMessage()));
+                .map(entity -> {
+                    backend.health().recordSuccess();
+                    return new ProxyResult(
+                            entity.getStatusCode(),
+                            stripHopByHop(entity.getHeaders()),
+                            entity.getBody() != null ? entity.getBody() : new byte[0]);
+                })
+                .onErrorResume(ex -> {
+                    boolean timedOut = ex instanceof TimeoutException;
+                    backend.health().recordFailure(clock.millis(), threshold, banMs);
+                    log.warn("Backend {} failed ({}); failing over (attempt {} of {})",
+                            backend.url(), ex.toString(), idx + 1, limit);
+                    return attempt(candidates, idx + 1, limit, body, requestHeaders, timeout,
+                            threshold, banMs, timedOut);
+                });
     }
 
     private static void copyForwardable(HttpHeaders src, HttpHeaders dst) {
