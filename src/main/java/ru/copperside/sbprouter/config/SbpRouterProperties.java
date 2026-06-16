@@ -19,6 +19,7 @@ public class SbpRouterProperties {
     private Duration timeout = Duration.ofSeconds(30);
     private Failover failover = new Failover();
     private CircuitBreaker circuitBreaker = new CircuitBreaker();
+    private Admin admin = new Admin();
     private Kafka kafka = new Kafka();
 
     public String getActiveGroup() { return activeGroup; }
@@ -31,6 +32,8 @@ public class SbpRouterProperties {
     public void setFailover(Failover failover) { this.failover = failover; }
     public CircuitBreaker getCircuitBreaker() { return circuitBreaker; }
     public void setCircuitBreaker(CircuitBreaker circuitBreaker) { this.circuitBreaker = circuitBreaker; }
+    public Admin getAdmin() { return admin; }
+    public void setAdmin(Admin admin) { this.admin = admin; }
     public Kafka getKafka() { return kafka; }
     public void setKafka(Kafka kafka) { this.kafka = kafka; }
 
@@ -57,6 +60,20 @@ public class SbpRouterProperties {
         public void setFailureThreshold(int failureThreshold) { this.failureThreshold = failureThreshold; }
         public Duration getBanDuration() { return banDuration; }
         public void setBanDuration(Duration banDuration) { this.banDuration = banDuration; }
+    }
+
+    /**
+     * Protection for the admin API (the {@code activegroup} actuator endpoint). When {@code apiKey}
+     * is blank the guard is disabled (local/dev). When set, requests to the admin endpoint must
+     * carry the key in {@code headerName}.
+     */
+    public static class Admin {
+        private String apiKey = "";
+        private String headerName = "X-Internal-Admin-Key";
+        public String getApiKey() { return apiKey; }
+        public void setApiKey(String apiKey) { this.apiKey = apiKey; }
+        public String getHeaderName() { return headerName; }
+        public void setHeaderName(String headerName) { this.headerName = headerName; }
     }
 
     public static class Kafka {
