@@ -12,6 +12,9 @@ import static org.springframework.web.reactive.function.server.RequestPredicates
 public class GcsvcRouter {
     @Bean
     public RouterFunction<ServerResponse> gcsvcRoute(GcsvcHandler handler) {
-        return RouterFunctions.route(POST("/api/gcsvc"), handler::handle);
+        // Match both /api/gcsvc and /api/gcsvc/ — real GCSvc clients send a trailing slash, and
+        // Spring 6 / Boot 3+ disable trailing-slash matching by default (otherwise the request
+        // falls through to the static-resource handler and 404s).
+        return RouterFunctions.route(POST("/api/gcsvc").or(POST("/api/gcsvc/")), handler::handle);
     }
 }

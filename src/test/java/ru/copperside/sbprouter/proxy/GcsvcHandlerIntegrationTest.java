@@ -74,6 +74,29 @@ class GcsvcHandlerIntegrationTest {
     }
 
     @Test
+    void proxiesWithTrailingSlashAndOctetStream() throws IOException {
+        // Real GCSvc clients POST to /api/gcsvc/ (trailing slash) with application/octet-stream.
+        // The route must match the trailing-slash form (Spring 6 disables trailing-slash match by
+        // default), otherwise the request falls through to the static-resource handler -> 404.
+        wireMock.stubFor(post(urlEqualTo("/api/gcsvc"))
+                .willReturn(aResponse()
+                        .withStatus(200)
+                        .withHeader("Content-Type", "application/xml")
+                        .withBody("<ok/>")));
+
+        byte[] requestXml = loadFixture("test-xml/req-auth-pay-b2c.xml");
+
+        webClient.post()
+                .uri("/api/gcsvc/")
+                .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                .bodyValue(requestXml)
+                .exchange()
+                .expectStatus().isOk();
+
+        wireMock.verify(1, postRequestedFor(urlEqualTo("/api/gcsvc")));
+    }
+
+    @Test
     void proxiesC2bReqNoticePayToInfosrv() throws IOException {
         String responseXml = """
                 <?xml version="1.0" encoding="UTF-8"?>
