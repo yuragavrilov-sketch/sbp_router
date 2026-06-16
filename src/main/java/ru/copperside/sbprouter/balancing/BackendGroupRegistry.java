@@ -7,25 +7,29 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Owns the configured backend groups and the currently-active group. Built and validated once at
- * startup (fail-fast on misconfiguration); the active group can be switched at runtime.
+ * startup (fail-fast on misconfiguration); the entire group set can be replaced atomically at
+ * runtime via {@link #replace(Map, String, long)} when a new routing config is applied.
  */
 @Component
 public class BackendGroupRegistry {
 
-    private final Map<String, BackendGroup> groups;
+    private final AtomicReference<Map<String, BackendGroup>> groups;
     private final AtomicReference<String> activeGroupName;
+    private final AtomicLong appliedVersion = new AtomicLong(0L);
 
     public BackendGroupRegistry(SbpRouterProperties properties) {
-        this.groups = build(properties);
+        Map<String, BackendGroup> built = build(properties);
         String active = properties.getActiveGroup();
-        if (active == null || !groups.containsKey(active)) {
+        if (active == null || !built.containsKey(active)) {
             throw new IllegalStateException(
-                    "sbp-router.active-group '" + active + "' is not one of the configured groups " + groups.keySet());
+                    "sbp-router.active-group '" + active + "' is not one of the configured groups " + built.keySet());
         }
+        this.groups = new AtomicReference<>(built);
         this.activeGroupName = new AtomicReference<>(active);
     }
 
@@ -53,7 +57,7 @@ public class BackendGroupRegistry {
     }
 
     public BackendGroup activeGroup() {
-        return groups.get(activeGroupName.get());
+        return groups.get().get(activeGroupName.get());
     }
 
     public String activeGroupName() {
@@ -61,13 +65,31 @@ public class BackendGroupRegistry {
     }
 
     public void setActiveGroup(String name) {
-        if (!groups.containsKey(name)) {
+        if (!groups.get().containsKey(name)) {
             throw new IllegalArgumentException("unknown group: " + name);
         }
         activeGroupName.set(name);
     }
 
     public Map<String, BackendGroup> groups() {
-        return groups;
+        return groups.get();
+    }
+
+    public long appliedVersion() {
+        return appliedVersion.get();
+    }
+
+    /**
+     * Atomically swap the whole group set + active group (e.g. from a published routing config).
+     * Fresh {@link BackendHealth} instances mean ban state resets on every reconfig.
+     */
+    public void replace(Map<String, BackendGroup> newGroups, String activeGroup, long version) {
+        if (newGroups == null || newGroups.isEmpty() || !newGroups.containsKey(activeGroup)) {
+            throw new IllegalArgumentException("invalid routing config: activeGroup '" + activeGroup
+                    + "' not in " + (newGroups == null ? "null" : newGroups.keySet()));
+        }
+        this.groups.set(Map.copyOf(newGroups));
+        this.activeGroupName.set(activeGroup);
+        this.appliedVersion.set(version);
     }
 }
