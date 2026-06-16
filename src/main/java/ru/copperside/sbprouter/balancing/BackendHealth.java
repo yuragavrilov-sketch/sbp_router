@@ -4,7 +4,11 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Per-backend circuit-breaker state. Time is passed in by the caller (no Clock dependency) so the
- * class is trivially unit-testable. Thread-safe: counter is atomic, ban timestamp is volatile.
+ * class is trivially unit-testable. Thread-safe but <b>best-effort</b>: the counter is atomic and
+ * the ban timestamp is volatile, but {@code recordFailure}/{@code recordSuccess} are not a single
+ * atomic transaction across both fields. Under concurrent failures the ban may trigger one failure
+ * early/late or the actuator may read a transient inconsistent snapshot — acceptable for an
+ * in-memory, per-instance circuit-breaker (no correctness/safety impact on proxying).
  */
 public class BackendHealth {
 

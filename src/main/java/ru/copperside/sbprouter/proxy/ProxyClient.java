@@ -7,7 +7,6 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
-import org.springframework.web.reactive.function.client.WebClientRequestException;
 import reactor.core.publisher.Mono;
 import reactor.netty.http.client.HttpClientRequest;
 import ru.copperside.sbprouter.balancing.AllBackendsFailedException;
@@ -98,16 +97,17 @@ public class ProxyClient {
     }
 
     /**
-     * Returns true if the exception represents a response timeout (ReadTimeoutException from
-     * per-request responseTimeout, or any TimeoutException in the chain).
+     * Returns true if the exception represents a response timeout — a {@link ReadTimeoutException}
+     * (from the per-request responseTimeout) or a {@link java.util.concurrent.TimeoutException}
+     * anywhere in the cause chain (it may be wrapped, e.g. in a WebClientRequestException or a
+     * body-streaming close). Connection refused/reset are non-timeout transport errors and return
+     * false, so they still trigger failover + ban but map to 502 rather than 504.
      */
     private static boolean isTimeout(Throwable ex) {
-        if (ex instanceof ReadTimeoutException) {
-            return true;
-        }
-        if (ex instanceof WebClientRequestException wre) {
-            Throwable cause = wre.getCause();
-            return cause instanceof ReadTimeoutException;
+        for (Throwable t = ex; t != null && t != t.getCause(); t = t.getCause()) {
+            if (t instanceof ReadTimeoutException || t instanceof java.util.concurrent.TimeoutException) {
+                return true;
+            }
         }
         return false;
     }
