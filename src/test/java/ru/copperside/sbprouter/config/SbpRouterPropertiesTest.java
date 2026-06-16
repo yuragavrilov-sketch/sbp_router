@@ -20,6 +20,13 @@ class SbpRouterPropertiesTest {
         // Kafka defaults preserved
         assertThat(p.getKafka().isEnabled()).isFalse();
         assertThat(p.getKafka().getTopic()).isEqualTo("sbp-router-traffic");
+        // ActiveGroupSync defaults
+        assertThat(p.getActiveGroupSync().isEnabled()).isFalse();
+        assertThat(p.getActiveGroupSync().getTopic()).isEqualTo("sbp-router-active-group");
+        // Heartbeat defaults
+        assertThat(p.getHeartbeat().isEnabled()).isFalse();
+        assertThat(p.getHeartbeat().getTopic()).isEqualTo("sbp-router-heartbeat");
+        assertThat(p.getHeartbeat().getInterval()).isEqualTo(Duration.ofSeconds(15));
     }
 
     @Test

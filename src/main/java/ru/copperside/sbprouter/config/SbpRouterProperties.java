@@ -21,6 +21,8 @@ public class SbpRouterProperties {
     private CircuitBreaker circuitBreaker = new CircuitBreaker();
     private Admin admin = new Admin();
     private Kafka kafka = new Kafka();
+    private ActiveGroupSync activeGroupSync = new ActiveGroupSync();
+    private Heartbeat heartbeat = new Heartbeat();
 
     public String getActiveGroup() { return activeGroup; }
     public void setActiveGroup(String activeGroup) { this.activeGroup = activeGroup; }
@@ -36,6 +38,10 @@ public class SbpRouterProperties {
     public void setAdmin(Admin admin) { this.admin = admin; }
     public Kafka getKafka() { return kafka; }
     public void setKafka(Kafka kafka) { this.kafka = kafka; }
+    public ActiveGroupSync getActiveGroupSync() { return activeGroupSync; }
+    public void setActiveGroupSync(ActiveGroupSync activeGroupSync) { this.activeGroupSync = activeGroupSync; }
+    public Heartbeat getHeartbeat() { return heartbeat; }
+    public void setHeartbeat(Heartbeat heartbeat) { this.heartbeat = heartbeat; }
 
     /** A group is just an ordered set of backend URLs. */
     public static class Group {
@@ -87,5 +93,28 @@ public class SbpRouterProperties {
         public void setBootstrapServers(String bootstrapServers) { this.bootstrapServers = bootstrapServers; }
         public String getTopic() { return topic; }
         public void setTopic(String topic) { this.topic = topic; }
+    }
+
+    public static class ActiveGroupSync {
+        private boolean enabled = false;
+        private String topic = "sbp-router-active-group";
+
+        public boolean isEnabled() { return enabled; }
+        public void setEnabled(boolean enabled) { this.enabled = enabled; }
+        public String getTopic() { return topic; }
+        public void setTopic(String topic) { this.topic = topic; }
+    }
+
+    public static class Heartbeat {
+        private boolean enabled = false;
+        private String topic = "sbp-router-heartbeat";
+        private java.time.Duration interval = java.time.Duration.ofSeconds(15);
+
+        public boolean isEnabled() { return enabled; }
+        public void setEnabled(boolean enabled) { this.enabled = enabled; }
+        public String getTopic() { return topic; }
+        public void setTopic(String topic) { this.topic = topic; }
+        public java.time.Duration getInterval() { return interval; }
+        public void setInterval(java.time.Duration interval) { this.interval = interval; }
     }
 }
