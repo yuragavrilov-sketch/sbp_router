@@ -3,6 +3,7 @@ package ru.copperside.sbprouter.proxy;
 import io.micrometer.core.instrument.Timer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.server.ServerRequest;
@@ -110,33 +111,42 @@ public class GcsvcHandler {
                         extraHeaders.put("correlationId", extraction.correlationId());
                     }
 
-                    return proxyClient.forward(decision.upstreamName(), body, extraHeaders)
-                            .flatMap(responseBody -> {
+                    return proxyClient.forward(decision.upstreamName(), body,
+                                    request.headers().asHttpHeaders(), extraHeaders)
+                            .flatMap(result -> {
                                 log.info("Upstream response received",
                                         kv("correlationId", extraction.correlationId()),
                                         kv("upstream", decision.upstreamName()),
-                                        kv("responseSize", responseBody.length));
+                                        kv("status", result.status().value()),
+                                        kv("responseSize", result.body().length));
                                 metrics.stopTimer(timerSample, extraction.requestType(), decision.upstreamName());
+                                String outcome = result.status().is2xxSuccessful()
+                                        ? "success" : "upstream-status-" + result.status().value();
                                 trafficPublisher.publishResponse(txId, extraction.correlationId(),
-                                        extraction.requestType(), decision.upstreamName(), "success", responseBody);
-                                return ServerResponse.ok()
-                                        .contentType(MediaType.APPLICATION_XML)
-                                        .bodyValue(responseBody);
+                                        extraction.requestType(), decision.upstreamName(), outcome, result.body());
+                                // Transparent relay: upstream status + headers + body verbatim.
+                                return ServerResponse.status(result.status())
+                                        .headers(h -> h.addAll(result.headers()))
+                                        .bodyValue(result.body());
                             })
                             .onErrorResume(ex -> {
-                                log.error("Upstream error",
+                                // No HTTP response from upstream (connection refused/reset/timeout):
+                                // synthesize a gateway error, since there is no upstream status to relay.
+                                log.error("Upstream transport error",
                                         kv("correlationId", extraction.correlationId()),
                                         kv("upstream", decision.upstreamName()),
                                         kv("error", ex.getMessage()));
                                 metrics.recordUpstreamError(
                                         extraction.requestType(), decision.upstreamName(), ex.getClass().getSimpleName());
                                 metrics.stopTimer(timerSample, extraction.requestType(), decision.upstreamName());
+                                HttpStatus status = ex instanceof java.util.concurrent.TimeoutException
+                                        ? HttpStatus.GATEWAY_TIMEOUT : HttpStatus.BAD_GATEWAY;
                                 String errorXml = errorResponseBuilder.buildErrorResponse(
                                         extraction.requestType(), ex.getMessage());
                                 trafficPublisher.publishResponse(txId, extraction.correlationId(),
                                         extraction.requestType(), decision.upstreamName(), "upstream-error",
                                         errorXml.getBytes(StandardCharsets.UTF_8));
-                                return ServerResponse.ok()
+                                return ServerResponse.status(status)
                                         .contentType(MediaType.APPLICATION_XML)
                                         .bodyValue(errorXml);
                             });

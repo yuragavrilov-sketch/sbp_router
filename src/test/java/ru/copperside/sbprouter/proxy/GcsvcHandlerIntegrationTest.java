@@ -127,19 +127,20 @@ class GcsvcHandlerIntegrationTest {
     }
 
     @Test
-    void returnsErrorXml_whenUpstreamUnavailable() throws IOException {
+    void returns502WithErrorXml_whenUpstreamUnavailable() throws IOException {
         wireMock.stubFor(post(urlEqualTo("/api/gcsvc"))
                 .willReturn(aResponse().withFault(com.github.tomakehurst.wiremock.http.Fault.CONNECTION_RESET_BY_PEER)));
 
         byte[] requestXml = loadFixture("test-xml/req-auth-pay-b2c.xml");
 
+        // Transport failure (no upstream HTTP response) -> 502 Bad Gateway with GCSvc error XML body.
         String body = webClient.post()
                 .uri("/api/gcsvc")
                 .contentType(MediaType.APPLICATION_XML)
                 .accept(MediaType.APPLICATION_XML)
                 .bodyValue(requestXml)
                 .exchange()
-                .expectStatus().isOk()
+                .expectStatus().isEqualTo(502)
                 .expectBody(String.class)
                 .returnResult()
                 .getResponseBody();
