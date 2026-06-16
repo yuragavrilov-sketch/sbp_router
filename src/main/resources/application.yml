@@ -56,19 +56,25 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info,metrics,prometheus
+        include: health,info,metrics,prometheus,activegroup
   metrics:
     tags:
       application: sbp-router
 
 sbp-router:
-  # Flat pass-through proxy: every GCSvc request is forwarded to this single backend.
-  backend:
-    url: ${SBP_BACKEND_URL:http://infosrv.bank.local/api/gcsvc}
-    timeout: ${SBP_BACKEND_TIMEOUT:30s}
-    retry:
-      max-attempts: ${SBP_BACKEND_RETRY_MAX_ATTEMPTS:2}
-      backoff: ${SBP_BACKEND_RETRY_BACKOFF:500ms}
+  # Flat pass-through proxy over a pool of backends. All traffic goes to the active group;
+  # round-robin within it, with per-backend circuit-breaking on transport failures.
+  active-group: ${SBP_ACTIVE_GROUP:default}
+  groups:
+    default:
+      backends:
+        - ${SBP_BACKEND_URL:http://infosrv.bank.local/api/gcsvc}
+  timeout: ${SBP_BACKEND_TIMEOUT:30s}
+  failover:
+    max-attempts: ${SBP_FAILOVER_MAX:2}
+  circuit-breaker:
+    failure-threshold: ${SBP_CB_THRESHOLD:3}
+    ban-duration: ${SBP_CB_BAN:30s}
 
   kafka:
     enabled: ${KAFKA_ENABLED:false}

@@ -48,7 +48,7 @@ class GcsvcKafkaPublishIntegrationTest {
     @DynamicPropertySource
     static void props(DynamicPropertyRegistry registry) {
         wireMock.start();
-        registry.add("sbp-router.backend.url", () -> wireMock.baseUrl() + "/api/gcsvc");
+        registry.add("sbp-router.groups.default.backends[0]", () -> wireMock.baseUrl() + "/api/gcsvc");
         registry.add("sbp-router.kafka.enabled", () -> "true");
         registry.add("sbp-router.kafka.bootstrap-servers",
                 () -> System.getProperty("spring.embedded.kafka.brokers"));

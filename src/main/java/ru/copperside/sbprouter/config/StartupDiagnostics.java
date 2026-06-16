@@ -9,6 +9,7 @@ import org.springframework.core.env.Environment;
 import org.springframework.core.env.PropertySource;
 import org.springframework.stereotype.Component;
 
+import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -34,7 +35,7 @@ public class StartupDiagnostics implements ApplicationListener<ApplicationReadyE
     void logConfiguration() {
         log.info(
                 "Startup configuration: application={}, environment={}, profiles={}, serverPort={}, "
-                        + "configImports={}, configServerEnabled={}, vaultEnabled={}, backend={}",
+                        + "configImports={}, configServerEnabled={}, vaultEnabled={}, activeGroup={}, groups={}",
                 property("spring.application.name", "unknown"),
                 property("pay.environment", "unknown"),
                 profiles(),
@@ -42,7 +43,8 @@ public class StartupDiagnostics implements ApplicationListener<ApplicationReadyE
                 configImports(),
                 property("spring.cloud.config.enabled", "false"),
                 property("spring.cloud.vault.enabled", "false"),
-                backendHost()
+                routerProperties.getActiveGroup(),
+                groupsSummary()
         );
         logPropertySources();
         logExternalConfigState();
@@ -130,9 +132,16 @@ public class StartupDiagnostics implements ApplicationListener<ApplicationReadyE
         return environment.getProperty(name, defaultValue);
     }
 
-    private String backendHost() {
-        SbpRouterProperties.Backend backend = routerProperties.getBackend();
-        return backend != null ? host(backend.getUrl()) : "not-configured";
+    private String groupsSummary() {
+        Map<String, SbpRouterProperties.Group> groups = routerProperties.getGroups();
+        if (groups == null || groups.isEmpty()) {
+            return "none";
+        }
+        return groups.entrySet().stream()
+                .map(e -> e.getKey() + ":[" + e.getValue().getBackends().stream()
+                        .map(StartupDiagnostics::host).collect(java.util.stream.Collectors.joining(",")) + "]")
+                .sorted()
+                .collect(java.util.stream.Collectors.joining("; "));
     }
 
     private static String host(String url) {

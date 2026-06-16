@@ -101,8 +101,9 @@ public class GcsvcHandler {
                                         kv("error", ex.getMessage()));
                                 metrics.recordUpstreamError(ex.getClass().getSimpleName());
                                 metrics.stopTimer(timerSample);
-                                HttpStatus status = ex instanceof java.util.concurrent.TimeoutException
-                                        ? HttpStatus.GATEWAY_TIMEOUT : HttpStatus.BAD_GATEWAY;
+                                boolean timedOut = ex instanceof ru.copperside.sbprouter.balancing.AllBackendsFailedException e
+                                        && e.lastWasTimeout();
+                                HttpStatus status = timedOut ? HttpStatus.GATEWAY_TIMEOUT : HttpStatus.BAD_GATEWAY;
                                 String errorXml = errorResponseBuilder.buildErrorResponse(null, ex.getMessage());
                                 trafficPublisher.publishResponse(txId, correlationId, "backend-error",
                                         errorXml.getBytes(StandardCharsets.UTF_8));
