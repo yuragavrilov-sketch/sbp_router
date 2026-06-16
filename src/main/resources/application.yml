@@ -56,7 +56,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info,metrics,prometheus,activegroup
+        include: health,info,metrics,prometheus
   metrics:
     tags:
       application: sbp-router
@@ -82,6 +82,18 @@ sbp-router:
   admin:
     api-key: ${SBP_ADMIN_API_KEY:${INTERNAL_ADMIN_API_KEY:}}
     header-name: ${SBP_ADMIN_HEADER:X-Internal-Admin-Key}
+
+  # Cross-replica active-group sync: POST /admin/active-group broadcasts via this compacted topic;
+  # every pod consumes it (unique group.id) and converges. Off = single-instance in-memory switch.
+  active-group-sync:
+    enabled: ${SBP_ACTIVE_GROUP_SYNC_ENABLED:false}
+    topic: ${SBP_ACTIVE_GROUP_TOPIC:sbp-router-active-group}
+
+  # Fleet heartbeat: each pod publishes presence + metrics for the management fleet view.
+  heartbeat:
+    enabled: ${SBP_HEARTBEAT_ENABLED:false}
+    topic: ${SBP_HEARTBEAT_TOPIC:sbp-router-heartbeat}
+    interval: ${SBP_HEARTBEAT_INTERVAL:15s}
 
   kafka:
     enabled: ${KAFKA_ENABLED:false}

@@ -24,4 +24,32 @@ class MetricsServiceTest {
         assertThat(registry.get("sbp_router_kafka_publish_errors_total")
                 .tag("direction", "request").counter().count()).isEqualTo(1.0);
     }
+
+    @Test
+    void snapshotReflectsRecordedMeters() {
+        SimpleMeterRegistry registry = new SimpleMeterRegistry();
+        MetricsService metrics = new MetricsService(registry);
+
+        metrics.incrementActiveRequests();
+        metrics.incrementActiveRequests();
+        metrics.recordRequest();
+        metrics.recordRequest();
+        metrics.recordRequest();
+        metrics.recordUpstreamError("TimeoutException");
+        metrics.recordKafkaPublished("request");
+
+        MetricsService.MetricsSnapshot s = metrics.snapshot();
+        assertThat(s.activeRequests()).isEqualTo(2);
+        assertThat(s.requestsTotal()).isEqualTo(3.0);
+        assertThat(s.upstreamErrorsTotal()).isEqualTo(1.0);
+        assertThat(s.kafkaPublishedTotal()).isEqualTo(1.0);
+    }
+
+    @Test
+    void snapshotReadsZeroForMissingMeters() {
+        MetricsService.MetricsSnapshot s = new MetricsService(new SimpleMeterRegistry()).snapshot();
+        assertThat(s.requestsTotal()).isZero();
+        assertThat(s.requestCount()).isZero();
+        assertThat(s.maxLatencyMs()).isZero();
+    }
 }
