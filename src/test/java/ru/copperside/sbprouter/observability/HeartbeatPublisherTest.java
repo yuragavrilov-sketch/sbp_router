@@ -35,6 +35,7 @@ class HeartbeatPublisherTest {
             assertThat(payload.get("instanceId")).isEqualTo("inst-1");
             assertThat(payload.get("startedAt")).isEqualTo("2026-06-16T10:00:00Z");
             assertThat(payload.get("activeGroup")).isEqualTo("default");
+            assertThat(payload.get("routingConfigVersion")).isEqualTo(0L);
             assertThat((List<String>) payload.get("groups")).containsExactly("default");
             assertThat((List<Map<String, Object>>) payload.get("backends")).hasSize(2);
             Map<String, Object> backend = ((List<Map<String, Object>>) payload.get("backends")).get(0);
