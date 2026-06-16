@@ -151,6 +151,30 @@ class GcsvcHandlerIntegrationTest {
     }
 
     @Test
+    void doesNotForwardClientCredentialsToUpstream() throws IOException {
+        wireMock.stubFor(post(urlEqualTo("/api/gcsvc"))
+                .willReturn(aResponse()
+                        .withStatus(200)
+                        .withHeader("Content-Type", "application/xml")
+                        .withBody("<ok/>")));
+
+        byte[] requestXml = loadFixture("test-xml/req-auth-pay-b2c.xml");
+
+        webClient.post()
+                .uri("/api/gcsvc")
+                .contentType(MediaType.APPLICATION_XML)
+                .header("Authorization", "Bearer caller-secret")
+                .header("Cookie", "session=abc")
+                .bodyValue(requestXml)
+                .exchange()
+                .expectStatus().isOk();
+
+        wireMock.verify(postRequestedFor(urlEqualTo("/api/gcsvc"))
+                .withHeader("Authorization", absent())
+                .withHeader("Cookie", absent()));
+    }
+
+    @Test
     void proxiesUnknownRequestToInfosrv() throws IOException {
         wireMock.stubFor(post(urlEqualTo("/api/gcsvc"))
                 .willReturn(aResponse()

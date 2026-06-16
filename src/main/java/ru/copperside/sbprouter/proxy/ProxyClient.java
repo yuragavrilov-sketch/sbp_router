@@ -27,6 +27,11 @@ public class ProxyClient {
             "host", "connection", "content-length", "transfer-encoding", "keep-alive",
             "te", "trailer", "upgrade", "proxy-authenticate", "proxy-authorization", "expect");
 
+    // Caller credentials are NOT forwarded to upstreams: the router authenticates to receivers on its
+    // own terms, and relaying a client's Authorization/Cookie would be a confused-deputy risk.
+    private static final Set<String> STRIPPED_REQUEST_HEADERS = Set.of(
+            "authorization", "cookie", "x-api-key");
+
     private final WebClient webClient;
     private final RoutingConfigHolder holder;
 
@@ -81,7 +86,8 @@ public class ProxyClient {
             return;
         }
         src.forEach((name, values) -> {
-            if (!HOP_BY_HOP.contains(name.toLowerCase(Locale.ROOT))) {
+            String lower = name.toLowerCase(Locale.ROOT);
+            if (!HOP_BY_HOP.contains(lower) && !STRIPPED_REQUEST_HEADERS.contains(lower)) {
                 dst.addAll(name, values);
             }
         });
