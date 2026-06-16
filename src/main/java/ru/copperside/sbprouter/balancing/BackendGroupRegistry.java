@@ -11,22 +11,29 @@ import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Owns the configured backend groups and the currently-active group. Built and validated once at
- * startup (fail-fast on misconfiguration); the active group can be switched at runtime.
+ * startup (fail-fast on misconfiguration); the entire group set can be replaced atomically at
+ * runtime via {@link #replace(Map, String, long)} when a new routing config is applied.
+ *
+ * <p>The groups map, the active group name, and the applied version live in a single immutable
+ * {@link Snapshot} behind one {@link AtomicReference}, so a concurrent {@code replace()} is never
+ * observed half-applied (e.g. new groups paired with the old active name) by request threads.
  */
 @Component
 public class BackendGroupRegistry {
 
-    private final Map<String, BackendGroup> groups;
-    private final AtomicReference<String> activeGroupName;
+    private record Snapshot(Map<String, BackendGroup> groups, String activeGroupName, long version) {
+    }
+
+    private final AtomicReference<Snapshot> snapshot;
 
     public BackendGroupRegistry(SbpRouterProperties properties) {
-        this.groups = build(properties);
+        Map<String, BackendGroup> built = build(properties);
         String active = properties.getActiveGroup();
-        if (active == null || !groups.containsKey(active)) {
+        if (active == null || !built.containsKey(active)) {
             throw new IllegalStateException(
-                    "sbp-router.active-group '" + active + "' is not one of the configured groups " + groups.keySet());
+                    "sbp-router.active-group '" + active + "' is not one of the configured groups " + built.keySet());
         }
-        this.activeGroupName = new AtomicReference<>(active);
+        this.snapshot = new AtomicReference<>(new Snapshot(built, active, 0L));
     }
 
     private static Map<String, BackendGroup> build(SbpRouterProperties properties) {
@@ -53,21 +60,31 @@ public class BackendGroupRegistry {
     }
 
     public BackendGroup activeGroup() {
-        return groups.get(activeGroupName.get());
+        Snapshot s = snapshot.get();
+        return s.groups().get(s.activeGroupName());
     }
 
     public String activeGroupName() {
-        return activeGroupName.get();
-    }
-
-    public void setActiveGroup(String name) {
-        if (!groups.containsKey(name)) {
-            throw new IllegalArgumentException("unknown group: " + name);
-        }
-        activeGroupName.set(name);
+        return snapshot.get().activeGroupName();
     }
 
     public Map<String, BackendGroup> groups() {
-        return groups;
+        return snapshot.get().groups();
+    }
+
+    public long appliedVersion() {
+        return snapshot.get().version();
+    }
+
+    /**
+     * Atomically swap the whole group set + active group + version (e.g. from a published routing
+     * config). Fresh {@link BackendHealth} instances mean ban state resets on every reconfig.
+     */
+    public void replace(Map<String, BackendGroup> newGroups, String activeGroup, long version) {
+        if (newGroups == null || newGroups.isEmpty() || !newGroups.containsKey(activeGroup)) {
+            throw new IllegalArgumentException("invalid routing config: activeGroup '" + activeGroup
+                    + "' not in " + (newGroups == null ? "null" : newGroups.keySet()));
+        }
+        snapshot.set(new Snapshot(Map.copyOf(newGroups), activeGroup, version));
     }
 }

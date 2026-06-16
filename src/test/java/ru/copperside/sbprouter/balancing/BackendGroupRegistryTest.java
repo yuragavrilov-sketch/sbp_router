@@ -32,19 +32,12 @@ class BackendGroupRegistryTest {
     }
 
     @Test
-    void switchesActiveGroup() {
-        BackendGroupRegistry r = new BackendGroupRegistry(props("a",
-                Map.of("a", List.of("http://a/api"), "b", List.of("http://b/api"))));
-        r.setActiveGroup("b");
-        assertThat(r.activeGroupName()).isEqualTo("b");
-        assertThat(r.activeGroup().backends().get(0).url()).isEqualTo("http://b/api");
-    }
-
-    @Test
-    void unknownGroupSwitchThrows() {
+    void replaceRejectsActiveGroupNotInNewGroups() {
         BackendGroupRegistry r = new BackendGroupRegistry(
                 props("default", Map.of("default", List.of("http://a/api"))));
-        assertThatThrownBy(() -> r.setActiveGroup("nope"))
+        Map<String, BackendGroup> groups = Map.of("dr",
+                new BackendGroup("dr", List.of(new Backend("http://b/api", new BackendHealth()))));
+        assertThatThrownBy(() -> r.replace(groups, "nope", 2L))
                 .isInstanceOf(IllegalArgumentException.class);
         assertThat(r.activeGroupName()).isEqualTo("default"); // unchanged
     }
@@ -68,5 +61,22 @@ class BackendGroupRegistryTest {
     void rejectsNoGroups() {
         assertThatThrownBy(() -> new BackendGroupRegistry(props("default", Map.of())))
                 .isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    void replaceSwapsGroupsActiveAndVersion() {
+        BackendGroupRegistry r = new BackendGroupRegistry(
+                props("default", java.util.Map.of("default", java.util.List.of("http://a/api"))));
+        assertThat(r.appliedVersion()).isZero();
+
+        java.util.Map<String, ru.copperside.sbprouter.balancing.BackendGroup> groups = new java.util.LinkedHashMap<>();
+        groups.put("dr", new ru.copperside.sbprouter.balancing.BackendGroup("dr",
+                java.util.List.of(new ru.copperside.sbprouter.balancing.Backend("http://b/api", new ru.copperside.sbprouter.balancing.BackendHealth()))));
+        r.replace(groups, "dr", 5L);
+
+        assertThat(r.activeGroupName()).isEqualTo("dr");
+        assertThat(r.groups()).containsOnlyKeys("dr");
+        assertThat(r.activeGroup().backends().get(0).url()).isEqualTo("http://b/api");
+        assertThat(r.appliedVersion()).isEqualTo(5L);
     }
 }

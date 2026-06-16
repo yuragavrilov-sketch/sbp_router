@@ -100,6 +100,7 @@ public class HeartbeatPublisher implements AutoCloseable {
         payload.put("startedAt", startedAt.toString());
         payload.put("timestamp", clock.instant().toString());
         payload.put("activeGroup", registry.activeGroupName());
+        payload.put("routingConfigVersion", registry.appliedVersion());
         payload.put("groups", new ArrayList<>(registry.groups().keySet()));
 
         long now = clock.millis();

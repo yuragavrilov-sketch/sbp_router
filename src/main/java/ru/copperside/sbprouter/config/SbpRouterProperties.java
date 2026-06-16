@@ -19,10 +19,9 @@ public class SbpRouterProperties {
     private Duration timeout = Duration.ofSeconds(30);
     private Failover failover = new Failover();
     private CircuitBreaker circuitBreaker = new CircuitBreaker();
-    private Admin admin = new Admin();
     private Kafka kafka = new Kafka();
-    private ActiveGroupSync activeGroupSync = new ActiveGroupSync();
     private Heartbeat heartbeat = new Heartbeat();
+    private RoutingConfig routingConfig = new RoutingConfig();
 
     public String getActiveGroup() { return activeGroup; }
     public void setActiveGroup(String activeGroup) { this.activeGroup = activeGroup; }
@@ -34,14 +33,12 @@ public class SbpRouterProperties {
     public void setFailover(Failover failover) { this.failover = failover; }
     public CircuitBreaker getCircuitBreaker() { return circuitBreaker; }
     public void setCircuitBreaker(CircuitBreaker circuitBreaker) { this.circuitBreaker = circuitBreaker; }
-    public Admin getAdmin() { return admin; }
-    public void setAdmin(Admin admin) { this.admin = admin; }
     public Kafka getKafka() { return kafka; }
     public void setKafka(Kafka kafka) { this.kafka = kafka; }
-    public ActiveGroupSync getActiveGroupSync() { return activeGroupSync; }
-    public void setActiveGroupSync(ActiveGroupSync activeGroupSync) { this.activeGroupSync = activeGroupSync; }
     public Heartbeat getHeartbeat() { return heartbeat; }
     public void setHeartbeat(Heartbeat heartbeat) { this.heartbeat = heartbeat; }
+    public RoutingConfig getRoutingConfig() { return routingConfig; }
+    public void setRoutingConfig(RoutingConfig routingConfig) { this.routingConfig = routingConfig; }
 
     /** A group is just an ordered set of backend URLs. */
     public static class Group {
@@ -68,20 +65,6 @@ public class SbpRouterProperties {
         public void setBanDuration(Duration banDuration) { this.banDuration = banDuration; }
     }
 
-    /**
-     * Protection for the admin API ({@code /admin/**}, i.e. {@code GET/POST /admin/active-group}).
-     * When {@code apiKey} is blank the guard is disabled (local/dev). When set, requests to the admin
-     * endpoints must carry the key in {@code headerName}.
-     */
-    public static class Admin {
-        private String apiKey = "";
-        private String headerName = "X-Internal-Admin-Key";
-        public String getApiKey() { return apiKey; }
-        public void setApiKey(String apiKey) { this.apiKey = apiKey; }
-        public String getHeaderName() { return headerName; }
-        public void setHeaderName(String headerName) { this.headerName = headerName; }
-    }
-
     public static class Kafka {
         private boolean enabled = false;
         private String bootstrapServers = "localhost:9092";
@@ -91,16 +74,6 @@ public class SbpRouterProperties {
         public void setEnabled(boolean enabled) { this.enabled = enabled; }
         public String getBootstrapServers() { return bootstrapServers; }
         public void setBootstrapServers(String bootstrapServers) { this.bootstrapServers = bootstrapServers; }
-        public String getTopic() { return topic; }
-        public void setTopic(String topic) { this.topic = topic; }
-    }
-
-    public static class ActiveGroupSync {
-        private boolean enabled = false;
-        private String topic = "sbp-router-active-group";
-
-        public boolean isEnabled() { return enabled; }
-        public void setEnabled(boolean enabled) { this.enabled = enabled; }
         public String getTopic() { return topic; }
         public void setTopic(String topic) { this.topic = topic; }
     }
@@ -116,5 +89,14 @@ public class SbpRouterProperties {
         public void setTopic(String topic) { this.topic = topic; }
         public java.time.Duration getInterval() { return interval; }
         public void setInterval(java.time.Duration interval) { this.interval = interval; }
+    }
+
+    public static class RoutingConfig {
+        private boolean enabled = false;
+        private String topic = "sbp-router-routing-config";
+        public boolean isEnabled() { return enabled; }
+        public void setEnabled(boolean enabled) { this.enabled = enabled; }
+        public String getTopic() { return topic; }
+        public void setTopic(String topic) { this.topic = topic; }
     }
 }
