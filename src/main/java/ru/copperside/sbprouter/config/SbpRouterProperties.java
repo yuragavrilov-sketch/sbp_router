@@ -23,6 +23,7 @@ public class SbpRouterProperties {
     private Kafka kafka = new Kafka();
     private ActiveGroupSync activeGroupSync = new ActiveGroupSync();
     private Heartbeat heartbeat = new Heartbeat();
+    private RoutingConfig routingConfig = new RoutingConfig();
 
     public String getActiveGroup() { return activeGroup; }
     public void setActiveGroup(String activeGroup) { this.activeGroup = activeGroup; }
@@ -42,6 +43,8 @@ public class SbpRouterProperties {
     public void setActiveGroupSync(ActiveGroupSync activeGroupSync) { this.activeGroupSync = activeGroupSync; }
     public Heartbeat getHeartbeat() { return heartbeat; }
     public void setHeartbeat(Heartbeat heartbeat) { this.heartbeat = heartbeat; }
+    public RoutingConfig getRoutingConfig() { return routingConfig; }
+    public void setRoutingConfig(RoutingConfig routingConfig) { this.routingConfig = routingConfig; }
 
     /** A group is just an ordered set of backend URLs. */
     public static class Group {
@@ -116,5 +119,14 @@ public class SbpRouterProperties {
         public void setTopic(String topic) { this.topic = topic; }
         public java.time.Duration getInterval() { return interval; }
         public void setInterval(java.time.Duration interval) { this.interval = interval; }
+    }
+
+    public static class RoutingConfig {
+        private boolean enabled = false;
+        private String topic = "sbp-router-routing-config";
+        public boolean isEnabled() { return enabled; }
+        public void setEnabled(boolean enabled) { this.enabled = enabled; }
+        public String getTopic() { return topic; }
+        public void setTopic(String topic) { this.topic = topic; }
     }
 }
