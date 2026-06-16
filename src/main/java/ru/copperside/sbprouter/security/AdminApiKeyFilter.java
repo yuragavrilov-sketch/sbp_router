@@ -13,19 +13,19 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 
 /**
- * Guards the admin API — the {@code activegroup} actuator endpoint, which can redirect all proxied
- * traffic at runtime — with a shared key. The GCSvc proxy port also serves actuator, so without this
- * the switch endpoint would be reachable by anyone who can reach the proxy ingress.
+ * Guards the admin API — the {@code /admin/active-group} endpoint, which can redirect all proxied
+ * traffic at runtime — with a shared key. The GCSvc proxy port also serves admin paths, so without
+ * this the switch endpoint would be reachable by anyone who can reach the proxy ingress.
  *
  * <p>When {@code sbp-router.admin.api-key} is blank the guard is disabled (local/dev). When set,
- * requests to {@code /actuator/activegroup} must carry the key in the configured header, else 401.
+ * requests to {@code /admin/**} must carry the key in the configured header, else 401.
  * Observability endpoints (health/info/metrics/prometheus) are intentionally left open so k8s probes
  * and scraping keep working.
  */
 @Component
 public class AdminApiKeyFilter implements WebFilter, Ordered {
 
-    private static final String PROTECTED_PREFIX = "/actuator/activegroup";
+    private static final String PROTECTED_PREFIX = "/admin";
 
     private final String apiKey;
     private final String headerName;

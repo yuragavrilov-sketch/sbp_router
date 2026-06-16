@@ -56,7 +56,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info,metrics,prometheus,activegroup
+        include: health,info,metrics,prometheus
   metrics:
     tags:
       application: sbp-router
@@ -76,12 +76,24 @@ sbp-router:
     failure-threshold: ${SBP_CB_THRESHOLD:3}
     ban-duration: ${SBP_CB_BAN:30s}
 
-  # Admin API guard for the `activegroup` actuator endpoint. Blank key = disabled (local/dev).
+  # Admin API guard for /admin/** (GET/POST /admin/active-group). Blank key = disabled (local/dev).
   # In test/prod set SBP_ADMIN_API_KEY (or reuse the contour's INTERNAL_ADMIN_API_KEY) from a
-  # k8s Secret / Vault. The switch endpoint then requires this key in the configured header.
+  # k8s Secret / Vault. The admin endpoints then require this key in the configured header.
   admin:
     api-key: ${SBP_ADMIN_API_KEY:${INTERNAL_ADMIN_API_KEY:}}
     header-name: ${SBP_ADMIN_HEADER:X-Internal-Admin-Key}
+
+  # Cross-replica active-group sync: POST /admin/active-group broadcasts via this compacted topic;
+  # every pod consumes it (unique group.id) and converges. Off = single-instance in-memory switch.
+  active-group-sync:
+    enabled: ${SBP_ACTIVE_GROUP_SYNC_ENABLED:false}
+    topic: ${SBP_ACTIVE_GROUP_TOPIC:sbp-router-active-group}
+
+  # Fleet heartbeat: each pod publishes presence + metrics for the management fleet view.
+  heartbeat:
+    enabled: ${SBP_HEARTBEAT_ENABLED:false}
+    topic: ${SBP_HEARTBEAT_TOPIC:sbp-router-heartbeat}
+    interval: ${SBP_HEARTBEAT_INTERVAL:15s}
 
   kafka:
     enabled: ${KAFKA_ENABLED:false}

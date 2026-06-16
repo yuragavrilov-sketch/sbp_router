@@ -31,7 +31,7 @@ class AdminApiKeyFilterTest {
     void blankKeyDisablesProtection() {
         AtomicBoolean passed = new AtomicBoolean(false);
         MockServerWebExchange exchange = MockServerWebExchange.from(
-                MockServerHttpRequest.post("/actuator/activegroup").build());
+                MockServerHttpRequest.post("/admin/active-group").build());
 
         filter("").filter(exchange, chain(passed)).block();
 
@@ -43,7 +43,7 @@ class AdminApiKeyFilterTest {
     void protectedPathWithoutKeyIsUnauthorized() {
         AtomicBoolean passed = new AtomicBoolean(false);
         MockServerWebExchange exchange = MockServerWebExchange.from(
-                MockServerHttpRequest.post("/actuator/activegroup").build());
+                MockServerHttpRequest.post("/admin/active-group").build());
 
         filter("secret").filter(exchange, chain(passed)).block();
 
@@ -55,7 +55,7 @@ class AdminApiKeyFilterTest {
     void protectedPathWithWrongKeyIsUnauthorized() {
         AtomicBoolean passed = new AtomicBoolean(false);
         MockServerWebExchange exchange = MockServerWebExchange.from(
-                MockServerHttpRequest.post("/actuator/activegroup")
+                MockServerHttpRequest.post("/admin/active-group")
                         .header("X-Internal-Admin-Key", "nope").build());
 
         filter("secret").filter(exchange, chain(passed)).block();
@@ -68,7 +68,7 @@ class AdminApiKeyFilterTest {
     void protectedPathWithCorrectKeyPasses() {
         AtomicBoolean passed = new AtomicBoolean(false);
         MockServerWebExchange exchange = MockServerWebExchange.from(
-                MockServerHttpRequest.get("/actuator/activegroup")
+                MockServerHttpRequest.get("/admin/active-group")
                         .header("X-Internal-Admin-Key", "secret").build());
 
         filter("secret").filter(exchange, chain(passed)).block();
