@@ -69,9 +69,9 @@ public class SbpRouterProperties {
     }
 
     /**
-     * Protection for the admin API (the {@code activegroup} actuator endpoint). When {@code apiKey}
-     * is blank the guard is disabled (local/dev). When set, requests to the admin endpoint must
-     * carry the key in {@code headerName}.
+     * Protection for the admin API ({@code /admin/**}, i.e. {@code GET/POST /admin/active-group}).
+     * When {@code apiKey} is blank the guard is disabled (local/dev). When set, requests to the admin
+     * endpoints must carry the key in {@code headerName}.
      */
     public static class Admin {
         private String apiKey = "";

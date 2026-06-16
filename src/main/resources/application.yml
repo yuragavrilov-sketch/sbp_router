@@ -76,9 +76,9 @@ sbp-router:
     failure-threshold: ${SBP_CB_THRESHOLD:3}
     ban-duration: ${SBP_CB_BAN:30s}
 
-  # Admin API guard for the `activegroup` actuator endpoint. Blank key = disabled (local/dev).
+  # Admin API guard for /admin/** (GET/POST /admin/active-group). Blank key = disabled (local/dev).
   # In test/prod set SBP_ADMIN_API_KEY (or reuse the contour's INTERNAL_ADMIN_API_KEY) from a
-  # k8s Secret / Vault. The switch endpoint then requires this key in the configured header.
+  # k8s Secret / Vault. The admin endpoints then require this key in the configured header.
   admin:
     api-key: ${SBP_ADMIN_API_KEY:${INTERNAL_ADMIN_API_KEY:}}
     header-name: ${SBP_ADMIN_HEADER:X-Internal-Admin-Key}

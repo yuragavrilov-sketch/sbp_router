@@ -2,6 +2,7 @@ package ru.copperside.sbprouter.observability;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.PostConstruct;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.serialization.ByteArraySerializer;
@@ -59,7 +60,8 @@ public class HeartbeatPublisher implements AutoCloseable {
     });
 
     public HeartbeatPublisher(BackendGroupRegistry registry, MetricsService metrics,
-                              SbpRouterProperties props, String instanceId, Instant startedAt, Clock clock) {
+                              SbpRouterProperties props, @Qualifier("instanceId") String instanceId,
+                              @Qualifier("startedAt") Instant startedAt, Clock clock) {
         this.registry = registry;
         this.metrics = metrics;
         this.props = props;

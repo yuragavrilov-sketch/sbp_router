@@ -8,6 +8,7 @@ import org.apache.kafka.common.serialization.ByteArrayDeserializer;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.SmartLifecycle;
 import org.springframework.stereotype.Component;
@@ -46,7 +47,8 @@ public class ActiveGroupConsumer implements SmartLifecycle {
     private volatile KafkaConsumer<String, byte[]> consumer;
     private Thread thread;
 
-    public ActiveGroupConsumer(BackendGroupRegistry registry, SbpRouterProperties props, String instanceId) {
+    public ActiveGroupConsumer(BackendGroupRegistry registry, SbpRouterProperties props,
+                               @Qualifier("instanceId") String instanceId) {
         this.registry = registry;
         this.topic = props.getActiveGroupSync().getTopic();
         Map<String, Object> cfg = new HashMap<>();
@@ -55,7 +57,10 @@ public class ActiveGroupConsumer implements SmartLifecycle {
         cfg.put(KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
         cfg.put(VALUE_DESERIALIZER_CLASS_CONFIG, ByteArrayDeserializer.class);
         cfg.put(AUTO_OFFSET_RESET_CONFIG, "earliest");
-        cfg.put(ENABLE_AUTO_COMMIT_CONFIG, true);
+        // No offset commits: each pod always replays from earliest and applies the latest record,
+        // so committing buys nothing and would leave an orphaned consumer group (unique per restart)
+        // accumulating in __consumer_offsets.
+        cfg.put(ENABLE_AUTO_COMMIT_CONFIG, false);
         this.consumerConfig = cfg;
     }
 
