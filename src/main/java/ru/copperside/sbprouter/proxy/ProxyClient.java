@@ -1,12 +1,15 @@
 package ru.copperside.sbprouter.proxy;
 
+import io.netty.handler.timeout.ReadTimeoutException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.reactive.function.client.WebClientRequestException;
 import reactor.core.publisher.Mono;
+import reactor.netty.http.client.HttpClientRequest;
 import ru.copperside.sbprouter.balancing.AllBackendsFailedException;
 import ru.copperside.sbprouter.balancing.Backend;
 import ru.copperside.sbprouter.balancing.BackendGroup;
@@ -19,7 +22,6 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
-import java.util.concurrent.TimeoutException;
 
 @Component
 public class ProxyClient {
@@ -73,8 +75,11 @@ public class ProxyClient {
         return webClient.post().uri(backend.url())
                 .headers(h -> copyForwardable(requestHeaders, h))
                 .bodyValue(body)
+                .httpRequest(req -> {
+                    HttpClientRequest nativeRequest = req.getNativeRequest();
+                    nativeRequest.responseTimeout(timeout);
+                })
                 .exchangeToMono(response -> response.toEntity(byte[].class))
-                .timeout(timeout)
                 .map(entity -> {
                     backend.health().recordSuccess();
                     return new ProxyResult(
@@ -83,13 +88,28 @@ public class ProxyClient {
                             entity.getBody() != null ? entity.getBody() : new byte[0]);
                 })
                 .onErrorResume(ex -> {
-                    boolean timedOut = ex instanceof TimeoutException;
+                    boolean timedOut = isTimeout(ex);
                     backend.health().recordFailure(clock.millis(), threshold, banMs);
                     log.warn("Backend {} failed ({}); failing over (attempt {} of {})",
                             backend.url(), ex.toString(), idx + 1, limit);
                     return attempt(candidates, idx + 1, limit, body, requestHeaders, timeout,
                             threshold, banMs, timedOut);
                 });
+    }
+
+    /**
+     * Returns true if the exception represents a response timeout (ReadTimeoutException from
+     * per-request responseTimeout, or any TimeoutException in the chain).
+     */
+    private static boolean isTimeout(Throwable ex) {
+        if (ex instanceof ReadTimeoutException) {
+            return true;
+        }
+        if (ex instanceof WebClientRequestException wre) {
+            Throwable cause = wre.getCause();
+            return cause instanceof ReadTimeoutException;
+        }
+        return false;
     }
 
     private static void copyForwardable(HttpHeaders src, HttpHeaders dst) {
