@@ -119,8 +119,13 @@ corporate deployments. Add more groups and backends via Config Server.
 | `SBP_FAILOVER_MAX` | Max distinct backends tried per request (K) | `2` |
 | `SBP_CB_THRESHOLD` | Consecutive transport errors before ban (N) | `3` |
 | `SBP_CB_BAN` | Ban duration (cooldown) | `30s` |
-| `SBP_ADMIN_API_KEY` | Key guarding the `activegroup` admin endpoint; blank = guard disabled (falls back to `INTERNAL_ADMIN_API_KEY`) | _(empty)_ |
+| `SBP_ADMIN_API_KEY` | Key guarding `/admin/**`; blank = guard disabled (falls back to `INTERNAL_ADMIN_API_KEY`) | _(empty)_ |
 | `SBP_ADMIN_HEADER` | Header carrying the admin key | `X-Internal-Admin-Key` |
+| `SBP_ACTIVE_GROUP_SYNC_ENABLED` | Broadcast active-group switches across replicas via Kafka (compacted topic) | `false` |
+| `SBP_ACTIVE_GROUP_TOPIC` | Active-group sync topic | `sbp-router-active-group` |
+| `SBP_HEARTBEAT_ENABLED` | Publish a fleet heartbeat (presence + metrics) to Kafka | `false` |
+| `SBP_HEARTBEAT_TOPIC` | Heartbeat topic | `sbp-router-heartbeat` |
+| `SBP_HEARTBEAT_INTERVAL` | Heartbeat interval | `15s` |
 
 ## Traffic publishing
 
@@ -181,25 +186,41 @@ docker compose up -d --build
 
 - `POST /api/gcsvc` — proxy entry point (GCSvc XML in, backend response out).
   Accepts a trailing slash (`/api/gcsvc/`) and any request content type.
-- `GET /actuator/activegroup` — read the current load-balancing state: active
-  group name and per-backend health (banned flag, ban expiry epoch-ms).
-- `POST /actuator/activegroup` — switch the active backend group at runtime.
-  Body: `{ "name": "<group-name>" }`. Returns 200 on success, 404 if the group
-  is unknown. The active group reverts to the configured `active-group` on
-  restart.
+- `GET /admin/active-group` — read the current load-balancing state: active group
+  name and per-backend health (banned flag, ban expiry epoch-ms).
+- `POST /admin/active-group` — switch the active backend group at runtime. Body:
+  `{ "name": "<group-name>" }`. 404 if the group is unknown. With active-group
+  sync **off**, applies in-memory on this pod and returns 200. With sync **on**,
+  publishes the switch to the compacted Kafka topic and returns 202; every replica
+  (including this one) then applies it via its consumer — so all pods converge.
+  The active group reverts to the configured `active-group` on restart unless a
+  later value is present on the sync topic.
 
-The `activegroup` endpoint (read and write) is **admin-protected**: when
-`SBP_ADMIN_API_KEY` is set, requests must carry it in the `SBP_ADMIN_HEADER`
-header (default `X-Internal-Admin-Key`) or get 401. When the key is blank the
-guard is disabled (local/dev). Observability endpoints (health/info/metrics/
-prometheus) stay open so probes and scraping keep working.
+The `/admin/**` API is **admin-protected**: when `SBP_ADMIN_API_KEY` is set,
+requests must carry it in the `SBP_ADMIN_HEADER` header (default
+`X-Internal-Admin-Key`) or get 401. Blank key = guard disabled (local/dev).
+Observability endpoints (health/info/metrics/prometheus) stay open for probes
+and scraping.
+
+## Cross-replica sync & fleet heartbeat
+
+When `SBP_ACTIVE_GROUP_SYNC_ENABLED=true`, the active group is broadcast on a
+compacted Kafka topic (`sbp-router-active-group`, key `active-group`). Each pod
+consumes it with a **unique** consumer group, so every replica receives every
+switch and a freshly-started pod replays the latest from earliest. Per-backend
+**ban state stays per-pod** (each replica reacts to what it observes).
+
+When `SBP_HEARTBEAT_ENABLED=true`, each pod publishes a periodic heartbeat
+(`sbp-router-heartbeat`, key = instance id) with `{instanceId, startedAt,
+activeGroup, groups[], backends[], metrics{}}` so the management service can show
+the running fleet and its metrics.
 
 ## Health / Observability
 
 - Health (with liveness/readiness probes): `http://localhost:8080/actuator/health`
 - Metrics: `http://localhost:8080/actuator/metrics`
 - Prometheus: `http://localhost:8080/actuator/prometheus`
-- Active group / backend health: `http://localhost:8080/actuator/activegroup`
+- Active group / backend health: `http://localhost:8080/admin/active-group`
 
 ## Build and test
 
