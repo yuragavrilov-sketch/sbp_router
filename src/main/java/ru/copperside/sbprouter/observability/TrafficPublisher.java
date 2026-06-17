@@ -12,6 +12,7 @@ import reactor.core.publisher.Mono;
 import reactor.kafka.sender.KafkaSender;
 import reactor.kafka.sender.SenderRecord;
 import ru.copperside.sbprouter.config.SbpRouterProperties;
+import ru.copperside.sbprouter.extraction.GcsvcMessageInfo;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
@@ -26,7 +27,7 @@ public class TrafficPublisher {
     private final KafkaSender<String, byte[]> sender; // null when Kafka disabled
     private final SbpRouterProperties properties;
     private final MetricsService metrics;
-    private final String env;
+    private final String environment;
 
     public TrafficPublisher(ObjectProvider<KafkaSender<String, byte[]>> senderProvider,
                             SbpRouterProperties properties,
@@ -35,26 +36,27 @@ public class TrafficPublisher {
         this.sender = senderProvider.getIfAvailable();
         this.properties = properties;
         this.metrics = metrics;
-        this.env = env;
+        this.environment = env;
     }
 
-    public void publishRequest(String txId, String correlationId, byte[] body) {
-        List<Header> headers = baseHeaders("request", txId, correlationId);
-        publish("request", txId, correlationId, body, headers);
+    public void publishRequest(String txId, GcsvcMessageInfo info, byte[] body) {
+        publish("request", txId, info, null, body);
     }
 
-    public void publishResponse(String txId, String correlationId, String outcome, byte[] body) {
-        List<Header> headers = baseHeaders("response", txId, correlationId);
-        headers.add(header("outcome", outcome != null ? outcome : "unknown"));
-        publish("response", txId, correlationId, body, headers);
+    public void publishResponse(String txId, GcsvcMessageInfo info, String outcome, byte[] body) {
+        publish("response", txId, info, outcome, body);
     }
 
-    private void publish(String direction, String txId, String correlationId,
-                         byte[] body, List<Header> headers) {
+    private void publish(String direction, String txId, GcsvcMessageInfo info, String outcome, byte[] body) {
         if (sender == null) {
             return; // Kafka disabled — no-op
         }
+        String correlationId = info != null ? info.correlationId() : null;
         String key = correlationId != null ? correlationId : txId;
+        List<Header> headers = headersFor(direction, txId, info, environment);
+        if (outcome != null) {
+            headers.add(header("outcome", outcome));
+        }
         String topic = properties.getKafka().getTopic();
         ProducerRecord<String, byte[]> record = new ProducerRecord<>(topic, null, key, body, headers);
         sender.send(Mono.just(SenderRecord.create(record, txId)))
@@ -67,16 +69,24 @@ public class TrafficPublisher {
                 .subscribe();
     }
 
-    private List<Header> baseHeaders(String direction, String txId, String correlationId) {
+    /** Builds the base traffic headers (null values skipped). Package-private for tests. */
+    static List<Header> headersFor(String direction, String txId, GcsvcMessageInfo info, String env) {
         List<Header> headers = new ArrayList<>();
         headers.add(header("direction", direction));
         headers.add(header("txId", txId));
-        if (correlationId != null) {
-            headers.add(header("correlationId", correlationId));
-        }
-        headers.add(header("env", env));
+        addIfPresent(headers, "correlationId", info == null ? null : info.correlationId());
+        addIfPresent(headers, "requestType", info == null ? null : info.messageType());
+        addIfPresent(headers, "operationId", info == null ? null : info.operationId());
+        addIfPresent(headers, "operationType", info == null ? null : info.operationType());
+        addIfPresent(headers, "env", env);
         headers.add(header("timestamp", Instant.now().toString()));
         return headers;
+    }
+
+    private static void addIfPresent(List<Header> headers, String key, String value) {
+        if (value != null && !value.isBlank()) {
+            headers.add(header(key, value));
+        }
     }
 
     private static Header header(String key, String value) {

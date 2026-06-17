@@ -74,12 +74,12 @@ public class CorrelationIdExtractor {
                 } else if (event == XMLStreamConstants.CHARACTERS) {
                     String text = reader.getText();
                     String value = text == null ? null : text.trim();
-                    if ("PNameID".equals(currentTag)) {
+                    if ("PNameID".equals(currentTag) && value != null && !value.isBlank()) {
                         pendingPName = value;
                     } else if ("PValue".equals(currentTag) && pendingPName != null
                             && WANTED_PARAMS.contains(pendingPName)) {
                         params.putIfAbsent(pendingPName, value);
-                    } else if (WANTED_PARAMS.contains(currentTag)) {
+                    } else if (currentTag != null && WANTED_PARAMS.contains(currentTag)) {
                         params.putIfAbsent(currentTag, value);
                     }
                 } else if (event == XMLStreamConstants.END_ELEMENT) {

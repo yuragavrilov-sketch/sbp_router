@@ -94,7 +94,7 @@ public class GcsvcHandler {
                             kv("bodySize", body.length));
 
                     metrics.recordRequest();
-                    trafficPublisher.publishRequest(txId, correlationId, body);
+                    trafficPublisher.publishRequest(txId, info, body);
 
                     Mono<ProxyClient.ProxyResult> forward = toAuthPay
                             ? proxyClient.forward(body, request.headers().asHttpHeaders(),
@@ -108,7 +108,7 @@ public class GcsvcHandler {
                                         ? (toAuthPay ? "authpay-ok" : "success")
                                         : (toAuthPay ? "authpay-status-" + result.status().value()
                                                      : "backend-status-" + result.status().value());
-                                trafficPublisher.publishResponse(txId, correlationId, outcome, result.body());
+                                trafficPublisher.publishResponse(txId, info, outcome, result.body());
                                 return ServerResponse.status(result.status())
                                         .headers(h -> h.addAll(result.headers()))
                                         .bodyValue(result.body());
@@ -122,7 +122,7 @@ public class GcsvcHandler {
                                 // Fail-closed for AuthPay: synthesize an AnsAuthPay refusal; never fall through
                                 // to the main group. (buildErrorResponse(null) already yields AnsAuthPay.)
                                 String errorXml = errorResponseBuilder.buildErrorResponse(info.messageType(), ex.getMessage());
-                                trafficPublisher.publishResponse(txId, correlationId,
+                                trafficPublisher.publishResponse(txId, info,
                                         toAuthPay ? "authpay-unavailable" : "backend-error",
                                         errorXml.getBytes(StandardCharsets.UTF_8));
                                 return ServerResponse.status(status)
