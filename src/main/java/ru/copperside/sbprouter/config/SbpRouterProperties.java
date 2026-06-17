@@ -22,6 +22,7 @@ public class SbpRouterProperties {
     private Kafka kafka = new Kafka();
     private Heartbeat heartbeat = new Heartbeat();
     private RoutingConfig routingConfig = new RoutingConfig();
+    private AuthPay authPay = new AuthPay();
 
     public String getActiveGroup() { return activeGroup; }
     public void setActiveGroup(String activeGroup) { this.activeGroup = activeGroup; }
@@ -39,6 +40,8 @@ public class SbpRouterProperties {
     public void setHeartbeat(Heartbeat heartbeat) { this.heartbeat = heartbeat; }
     public RoutingConfig getRoutingConfig() { return routingConfig; }
     public void setRoutingConfig(RoutingConfig routingConfig) { this.routingConfig = routingConfig; }
+    public AuthPay getAuthPay() { return authPay; }
+    public void setAuthPay(AuthPay authPay) { this.authPay = authPay; }
 
     /** A group is just an ordered set of backend URLs. */
     public static class Group {
@@ -98,5 +101,18 @@ public class SbpRouterProperties {
         public void setEnabled(boolean enabled) { this.enabled = enabled; }
         public String getTopic() { return topic; }
         public void setTopic(String topic) { this.topic = topic; }
+    }
+
+    /** Optional route: when enabled, ReqAuthPay messages go to this backend pool. */
+    public static class AuthPay {
+        private boolean enabled = false;
+        private List<String> backends = new ArrayList<>();
+        private Integer timeoutMs;
+        public boolean isEnabled() { return enabled; }
+        public void setEnabled(boolean enabled) { this.enabled = enabled; }
+        public List<String> getBackends() { return backends; }
+        public void setBackends(List<String> backends) { this.backends = backends; }
+        public Integer getTimeoutMs() { return timeoutMs; }
+        public void setTimeoutMs(Integer timeoutMs) { this.timeoutMs = timeoutMs; }
     }
 }

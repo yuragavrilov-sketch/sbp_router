@@ -3,6 +3,7 @@ package ru.copperside.sbprouter.balancing;
 import org.springframework.stereotype.Component;
 import ru.copperside.sbprouter.config.SbpRouterProperties;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -21,7 +22,8 @@ import java.util.concurrent.atomic.AtomicReference;
 @Component
 public class BackendGroupRegistry {
 
-    private record Snapshot(Map<String, BackendGroup> groups, String activeGroupName, long version) {
+    private record Snapshot(Map<String, BackendGroup> groups, String activeGroupName, long version,
+                            AuthPayRoute authPayRoute) {
     }
 
     private final AtomicReference<Snapshot> snapshot;
@@ -33,7 +35,23 @@ public class BackendGroupRegistry {
             throw new IllegalStateException(
                     "sbp-router.active-group '" + active + "' is not one of the configured groups " + built.keySet());
         }
-        this.snapshot = new AtomicReference<>(new Snapshot(built, active, 0L));
+        this.snapshot = new AtomicReference<>(new Snapshot(built, active, 0L, buildAuthPayRoute(properties)));
+    }
+
+    private static AuthPayRoute buildAuthPayRoute(SbpRouterProperties properties) {
+        SbpRouterProperties.AuthPay ap = properties.getAuthPay();
+        if (ap == null || !ap.isEnabled() || ap.getBackends() == null || ap.getBackends().isEmpty()) {
+            return AuthPayRoute.DISABLED;
+        }
+        List<Backend> backends = new ArrayList<>(ap.getBackends().size());
+        for (String url : ap.getBackends()) {
+            if (url == null || url.isBlank()) {
+                throw new IllegalStateException("sbp-router.auth-pay has a blank backend url");
+            }
+            backends.add(new Backend(url, new BackendHealth()));
+        }
+        Duration timeout = ap.getTimeoutMs() != null ? Duration.ofMillis(ap.getTimeoutMs()) : null;
+        return new AuthPayRoute(true, new BackendGroup("authpay", backends), timeout);
     }
 
     private static Map<String, BackendGroup> build(SbpRouterProperties properties) {
@@ -76,15 +94,26 @@ public class BackendGroupRegistry {
         return snapshot.get().version();
     }
 
+    public AuthPayRoute authPayRoute() {
+        return snapshot.get().authPayRoute();
+    }
+
     /**
-     * Atomically swap the whole group set + active group + version (e.g. from a published routing
-     * config). Fresh {@link BackendHealth} instances mean ban state resets on every reconfig.
+     * Atomically swap the whole group set + active group + version + AuthPay route (e.g. from a
+     * published routing config). Fresh {@link BackendHealth} instances mean ban state resets on every
+     * reconfig (groups and the AuthPay pool alike).
      */
-    public void replace(Map<String, BackendGroup> newGroups, String activeGroup, long version) {
+    public void replace(Map<String, BackendGroup> newGroups, String activeGroup, long version,
+                        AuthPayRoute authPayRoute) {
         if (newGroups == null || newGroups.isEmpty() || !newGroups.containsKey(activeGroup)) {
             throw new IllegalArgumentException("invalid routing config: activeGroup '" + activeGroup
                     + "' not in " + (newGroups == null ? "null" : newGroups.keySet()));
         }
-        snapshot.set(new Snapshot(Map.copyOf(newGroups), activeGroup, version));
+        snapshot.set(new Snapshot(Map.copyOf(newGroups), activeGroup, version,
+                authPayRoute != null ? authPayRoute : AuthPayRoute.DISABLED));
+    }
+
+    public void replace(Map<String, BackendGroup> newGroups, String activeGroup, long version) {
+        replace(newGroups, activeGroup, version, AuthPayRoute.DISABLED);
     }
 }
