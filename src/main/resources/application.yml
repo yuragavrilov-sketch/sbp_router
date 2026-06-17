@@ -76,6 +76,14 @@ sbp-router:
     failure-threshold: ${SBP_CB_THRESHOLD:3}
     ban-duration: ${SBP_CB_BAN:30s}
 
+  # Optional AuthPay route: ReqAuthPay messages are forwarded to this pool instead of the active
+  # group when enabled. Disabled by default (flat proxy). Normally driven by managed routing-config;
+  # these env defaults exist for static/smoke runs.
+  auth-pay:
+    enabled: ${SBP_AUTHPAY_ENABLED:false}
+    backends: ${SBP_AUTHPAY_BACKENDS:}
+    timeout-ms: ${SBP_AUTHPAY_TIMEOUT_MS:}
+
   # Fleet heartbeat: each pod publishes presence + metrics for the management fleet view.
   heartbeat:
     enabled: ${SBP_HEARTBEAT_ENABLED:false}
