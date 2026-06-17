@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Document stan="c2b-rcv-1"><GCSvc version="1"><Payment><ReqAuthPay>
+<ReqType>ReqPay</ReqType>
+<PayProfile><PNameID>SbpOperId</PNameID><PValue>A614711381</PValue></PayProfile>
+<PayProfile><PNameID>SbpOperation</PNameID><PValue>C2BQRS_Rcv</PValue></PayProfile>
+<PayProfile><PNameID>SbpOperType</PNameID><PValue>C2BQRS</PValue></PayProfile>
+</ReqAuthPay></Payment></GCSvc></Document>

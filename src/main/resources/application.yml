@@ -83,6 +83,7 @@ sbp-router:
     enabled: ${SBP_AUTHPAY_ENABLED:false}
     backends: ${SBP_AUTHPAY_BACKENDS:}
     timeout-ms: ${SBP_AUTHPAY_TIMEOUT_MS:}
+    sbp-operations: ${SBP_AUTHPAY_SBP_OPERATIONS:}
 
   # Fleet heartbeat: each pod publishes presence + metrics for the management fleet view.
   heartbeat:

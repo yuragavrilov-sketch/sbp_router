@@ -50,8 +50,10 @@ public class BackendGroupRegistry {
             }
             backends.add(new Backend(url, new BackendHealth()));
         }
-        Duration timeout = ap.getTimeoutMs() != null ? Duration.ofMillis(ap.getTimeoutMs()) : null;
-        return new AuthPayRoute(true, new BackendGroup("authpay", backends), timeout);
+        java.time.Duration timeout = ap.getTimeoutMs() != null ? java.time.Duration.ofMillis(ap.getTimeoutMs()) : null;
+        java.util.Set<String> ops = ap.getSbpOperations() == null ? java.util.Set.of()
+                : new java.util.HashSet<>(ap.getSbpOperations());
+        return new AuthPayRoute(true, new BackendGroup("authpay", backends), timeout, ops);
     }
 
     private static Map<String, BackendGroup> build(SbpRouterProperties properties) {

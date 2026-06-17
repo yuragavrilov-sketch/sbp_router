@@ -78,7 +78,14 @@ public class GcsvcHandler {
                     String correlationId = info.correlationId();
 
                     AuthPayRoute authPayRoute = registry.authPayRoute();
-                    boolean toAuthPay = authPayRoute.enabled() && "ReqAuthPay".equals(info.messageType());
+                    boolean toAuthPay = authPayRoute.enabled()
+                            && "ReqAuthPay".equals(info.messageType())
+                            && (authPayRoute.sbpOperations().isEmpty()
+                                || authPayRoute.sbpOperations().contains(info.sbpOperation()));
+
+                    log.info("AuthPay decision: enabled={} messageType={} sbpOperation={} sbpOperations={} toAuthPay={}",
+                            authPayRoute.enabled(), info.messageType(), info.sbpOperation(),
+                            authPayRoute.sbpOperations(), toAuthPay);
 
                     log.info("Proxying request",
                             kv("correlationId", correlationId),

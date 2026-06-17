@@ -133,7 +133,12 @@ public class RoutingConfigConsumer implements SmartLifecycle {
             return AuthPayRoute.DISABLED;
         }
         Duration timeout = ap.hasNonNull("timeoutMs") ? Duration.ofMillis(ap.path("timeoutMs").asLong()) : null;
-        return new AuthPayRoute(true, new BackendGroup("authpay", backends), timeout);
+        java.util.Set<String> ops = new java.util.HashSet<>();
+        for (JsonNode op : ap.path("sbpOperations")) {
+            String v = op.asText(null);
+            if (v != null && !v.isBlank()) ops.add(v);
+        }
+        return new AuthPayRoute(true, new BackendGroup("authpay", backends), timeout, ops);
     }
 
     @Override

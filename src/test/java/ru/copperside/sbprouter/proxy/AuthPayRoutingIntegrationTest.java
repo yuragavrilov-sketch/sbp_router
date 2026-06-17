@@ -31,6 +31,7 @@ class AuthPayRoutingIntegrationTest {
         registry.add("sbp-router.groups.default.backends[0]", () -> wireMock.baseUrl() + "/api/gcsvc");
         registry.add("sbp-router.auth-pay.enabled", () -> "true");
         registry.add("sbp-router.auth-pay.backends[0]", () -> wireMock.baseUrl() + "/authpay");
+        registry.add("sbp-router.auth-pay.sbp-operations[0]", () -> "C2BQRS_Rcv");
     }
 
     @AfterAll
@@ -52,7 +53,7 @@ class AuthPayRoutingIntegrationTest {
 
         String body = webClient.post().uri("/api/gcsvc")
                 .contentType(MediaType.APPLICATION_XML)
-                .bodyValue(loadFixture("test-xml/req-auth-pay-b2c.xml"))
+                .bodyValue(loadFixture("test-xml/req-auth-pay-c2b-rcv.xml"))
                 .exchange().expectStatus().isOk()
                 .expectBody(String.class).returnResult().getResponseBody();
 
@@ -83,7 +84,7 @@ class AuthPayRoutingIntegrationTest {
 
         String body = webClient.post().uri("/api/gcsvc")
                 .contentType(MediaType.APPLICATION_XML)
-                .bodyValue(loadFixture("test-xml/req-auth-pay-b2c.xml"))
+                .bodyValue(loadFixture("test-xml/req-auth-pay-c2b-rcv.xml"))
                 .exchange().expectStatus().isEqualTo(502)
                 .expectBody(String.class).returnResult().getResponseBody();
 
@@ -91,6 +92,35 @@ class AuthPayRoutingIntegrationTest {
         Assertions.assertTrue(body.contains("<Code>-1</Code>"));
         // Fail-closed: the main backend group must NOT be called.
         wireMock.verify(0, postRequestedFor(urlEqualTo("/api/gcsvc")));
+    }
+
+    @Test
+    void routesReqAuthPayToAuthPayPool_onlyWhenSbpOperationMatches() throws IOException {
+        wireMock.stubFor(post(urlEqualTo("/authpay")).willReturn(aResponse().withStatus(200)
+                .withHeader("Content-Type", "application/xml")
+                .withBody("<Document><GCSvc><Payment><AnsAuthPay><Status><Code>0</Code></Status></AnsAuthPay></Payment></GCSvc></Document>")));
+        wireMock.stubFor(post(urlEqualTo("/api/gcsvc")).willReturn(aResponse().withStatus(200)
+                .withHeader("Content-Type", "application/xml").withBody("<ok/>")));
+
+        // C2BQRS_Rcv -> AuthPay pool
+        webClient.post().uri("/api/gcsvc").contentType(MediaType.APPLICATION_XML)
+                .bodyValue(loadFixture("test-xml/req-auth-pay-c2b-rcv.xml"))
+                .exchange().expectStatus().isOk();
+        wireMock.verify(1, postRequestedFor(urlEqualTo("/authpay")));
+    }
+
+    @Test
+    void reqAuthPayWithNonMatchingSbpOperation_goesToActiveGroup() throws IOException {
+        wireMock.stubFor(post(urlEqualTo("/authpay")).willReturn(aResponse().withStatus(200).withBody("<x/>")));
+        wireMock.stubFor(post(urlEqualTo("/api/gcsvc")).willReturn(aResponse().withStatus(200)
+                .withHeader("Content-Type", "application/xml").withBody("<ok/>")));
+
+        // req-auth-pay-b2c.xml has B2COther_Snd -> NOT in sbpOperations -> NOT routed to AuthPay
+        webClient.post().uri("/api/gcsvc").contentType(MediaType.APPLICATION_XML)
+                .bodyValue(loadFixture("test-xml/req-auth-pay-b2c.xml"))
+                .exchange().expectStatus().isOk();
+        wireMock.verify(0, postRequestedFor(urlEqualTo("/authpay")));
+        wireMock.verify(1, postRequestedFor(urlEqualTo("/api/gcsvc")));
     }
 
     private byte[] loadFixture(String path) throws IOException {

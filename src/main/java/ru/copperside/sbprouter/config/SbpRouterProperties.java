@@ -108,11 +108,14 @@ public class SbpRouterProperties {
         private boolean enabled = false;
         private List<String> backends = new ArrayList<>();
         private Integer timeoutMs;
+        private java.util.List<String> sbpOperations = new java.util.ArrayList<>();
         public boolean isEnabled() { return enabled; }
         public void setEnabled(boolean enabled) { this.enabled = enabled; }
         public List<String> getBackends() { return backends; }
         public void setBackends(List<String> backends) { this.backends = backends; }
         public Integer getTimeoutMs() { return timeoutMs; }
         public void setTimeoutMs(Integer timeoutMs) { this.timeoutMs = timeoutMs; }
+        public java.util.List<String> getSbpOperations() { return sbpOperations; }
+        public void setSbpOperations(java.util.List<String> sbpOperations) { this.sbpOperations = sbpOperations; }
     }
 }

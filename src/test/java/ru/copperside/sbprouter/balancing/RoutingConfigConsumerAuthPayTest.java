@@ -28,4 +28,12 @@ class RoutingConfigConsumerAuthPayTest {
         assertThat(RoutingConfigConsumer.parseAuthPay(mapper.readTree(
                 "{\"authPay\":{\"enabled\":false,\"backends\":[\"http://x\"]}}")).enabled()).isFalse();
     }
+
+    @Test
+    void parsesSbpOperations() throws Exception {
+        AuthPayRoute r = RoutingConfigConsumer.parseAuthPay(new ObjectMapper().readTree(
+                "{\"authPay\":{\"enabled\":true,\"backends\":[\"http://x/authpay\"],"
+                + "\"sbpOperations\":[\"C2BQRD_Rcv\",\"C2BQRS_Rcv\"]}}"));
+        assertThat(r.sbpOperations()).containsExactlyInAnyOrder("C2BQRD_Rcv", "C2BQRS_Rcv");
+    }
 }

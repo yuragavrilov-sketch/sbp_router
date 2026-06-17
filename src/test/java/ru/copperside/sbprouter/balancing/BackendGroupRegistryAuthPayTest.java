@@ -44,7 +44,7 @@ class BackendGroupRegistryAuthPayTest {
         BackendGroupRegistry registry = new BackendGroupRegistry(baseProps());
         AuthPayRoute newRoute = new AuthPayRoute(true,
                 new BackendGroup("authpay", List.of(new Backend("http://authpay/z", new BackendHealth()))),
-                Duration.ofMillis(2000));
+                Duration.ofMillis(2000), java.util.Set.of());
         registry.replace(registry.groups(), "default", 5L, newRoute);
         assertThat(registry.authPayRoute().pool().backends()).hasSize(1);
         assertThat(registry.appliedVersion()).isEqualTo(5L);
