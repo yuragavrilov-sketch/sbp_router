@@ -27,23 +27,44 @@ public class CorrelationIdExtractor {
         XML_INPUT_FACTORY.setProperty(XMLInputFactory.IS_SUPPORTING_EXTERNAL_ENTITIES, false);
     }
 
+    private static final java.util.Set<String> MESSAGE_TYPES = java.util.Set.of(
+            "ReqAuthPay", "AnsAuthPay", "ReqNoticePay", "AnsNoticePay", "ReqPersonalList", "AnsPersonalList");
+
     /** Returns the {@code stan} attribute of {@code <Document>}, or {@code null} if absent/unparseable. */
     public String extract(byte[] xmlBytes) {
+        return extractMessageInfo(xmlBytes).correlationId();
+    }
+
+    /**
+     * Returns the correlation id (stan of {@code <Document>}) and the message type (local-name of the
+     * first application element among {@link #MESSAGE_TYPES}, namespace-agnostic so the GCSvcWS SOAP
+     * wrapper is handled). Either field may be {@code null} when absent/unparseable.
+     */
+    public GcsvcMessageInfo extractMessageInfo(byte[] xmlBytes) {
         if (xmlBytes == null || xmlBytes.length == 0) {
-            return null;
+            return new GcsvcMessageInfo(null, null);
         }
+        String stan = null;
+        String type = null;
         XMLStreamReader reader = null;
         try {
             reader = XML_INPUT_FACTORY.createXMLStreamReader(new ByteArrayInputStream(xmlBytes));
             while (reader.hasNext()) {
-                if (reader.next() == XMLStreamConstants.START_ELEMENT
-                        && "Document".equals(reader.getLocalName())) {
-                    // Root element reached — the stan lives here; no need to read further.
-                    return reader.getAttributeValue(null, "stan");
+                if (reader.next() == XMLStreamConstants.START_ELEMENT) {
+                    String localName = reader.getLocalName();
+                    if (stan == null && "Document".equals(localName)) {
+                        stan = reader.getAttributeValue(null, "stan");
+                    }
+                    if (type == null && MESSAGE_TYPES.contains(localName)) {
+                        type = localName;
+                    }
+                    if (stan != null && type != null) {
+                        break;
+                    }
                 }
             }
         } catch (Exception e) {
-            log.warn("Failed to parse correlation id from XML: {}", e.getMessage());
+            log.warn("Failed to parse GCSvc message info from XML: {}", e.getMessage());
         } finally {
             if (reader != null) {
                 try {
@@ -53,6 +74,6 @@ public class CorrelationIdExtractor {
                 }
             }
         }
-        return null;
+        return new GcsvcMessageInfo(stan, type);
     }
 }
