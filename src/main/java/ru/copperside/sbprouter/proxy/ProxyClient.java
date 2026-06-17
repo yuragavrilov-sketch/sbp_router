@@ -48,17 +48,23 @@ public class ProxyClient {
         this.clock = clock;
     }
 
-    /**
-     * Forwards the request to the active group: round-robin across healthy backends, failing over to
-     * the next on a transport error, up to {@code failover.max-attempts} distinct backends. The first
-     * backend that returns any HTTP response wins and its status/headers/body are relayed verbatim.
-     */
     public Mono<ProxyResult> forward(byte[] body, HttpHeaders requestHeaders) {
-        BackendGroup group = registry.activeGroup();
+        return forward(body, requestHeaders, registry.activeGroup(), null);
+    }
+
+    /**
+     * Forwards the request to the given backend group: round-robin across healthy backends, failing
+     * over to the next on a transport error, up to {@code failover.max-attempts} distinct backends.
+     * {@code timeoutOverride}, when non-null, replaces the global per-attempt timeout (used by the
+     * AuthPay route). The first backend that returns any HTTP response wins and is relayed verbatim.
+     */
+    public Mono<ProxyResult> forward(byte[] body, HttpHeaders requestHeaders, BackendGroup group,
+                                     Duration timeoutOverride) {
         List<Backend> candidates = loadBalancer.selectCandidates(group);
         int k = Math.max(1, properties.getFailover().getMaxAttempts());
         int limit = Math.min(k, candidates.size());
-        Duration timeout = properties.getTimeout() != null ? properties.getTimeout() : Duration.ofSeconds(30);
+        Duration timeout = timeoutOverride != null ? timeoutOverride
+                : (properties.getTimeout() != null ? properties.getTimeout() : Duration.ofSeconds(30));
         int threshold = properties.getCircuitBreaker().getFailureThreshold();
         long banMs = properties.getCircuitBreaker().getBanDuration().toMillis();
         return attempt(candidates, 0, limit, body, requestHeaders, timeout, threshold, banMs, false);
