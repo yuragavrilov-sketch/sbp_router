@@ -83,7 +83,7 @@ public class GcsvcHandler {
                             && (authPayRoute.sbpOperations().isEmpty()
                                 || authPayRoute.sbpOperations().contains(info.sbpOperation()));
 
-                    log.info("AuthPay decision: enabled={} messageType={} sbpOperation={} sbpOperations={} toAuthPay={}",
+                    log.debug("AuthPay decision: enabled={} messageType={} sbpOperation={} sbpOperations={} toAuthPay={}",
                             authPayRoute.enabled(), info.messageType(), info.sbpOperation(),
                             authPayRoute.sbpOperations(), toAuthPay);
 
