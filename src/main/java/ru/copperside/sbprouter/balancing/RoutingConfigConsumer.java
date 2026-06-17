@@ -110,11 +110,30 @@ public class RoutingConfigConsumer implements SmartLifecycle {
                 }
                 groups.put(name, new BackendGroup(name, backends));
             });
-            registry.replace(groups, active, version);
+            registry.replace(groups, active, version, parseAuthPay(n));
             log.info("Applied routing config v{}: activeGroup={} groups={}", version, active, groups.keySet());
         } catch (Exception e) {
             log.warn("routing-config: skipping unparseable/invalid message: {}", e.toString());
         }
+    }
+
+    static AuthPayRoute parseAuthPay(JsonNode root) {
+        JsonNode ap = root.path("authPay");
+        if (!ap.isObject() || !ap.path("enabled").asBoolean(false)) {
+            return AuthPayRoute.DISABLED;
+        }
+        List<Backend> backends = new ArrayList<>();
+        for (JsonNode url : ap.path("backends")) {
+            String u = url.asText(null);
+            if (u != null && !u.isBlank()) {
+                backends.add(new Backend(u, new BackendHealth()));
+            }
+        }
+        if (backends.isEmpty()) {
+            return AuthPayRoute.DISABLED;
+        }
+        Duration timeout = ap.hasNonNull("timeoutMs") ? Duration.ofMillis(ap.path("timeoutMs").asLong()) : null;
+        return new AuthPayRoute(true, new BackendGroup("authpay", backends), timeout);
     }
 
     @Override
